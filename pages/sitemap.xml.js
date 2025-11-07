@@ -1,11 +1,22 @@
 import dbConnect from '../lib/mongodb';
 import Article from '../models/Article';
 
-// Set your website's base URL
 const BASE_URL = 'https://news-nextjs.onrender.com';
 
 // Helper function to format date to YYYY-MM-DD
-const toISODate = (date) => new Date(date).toISOString().split('T')[0];
+// --- THIS IS THE FIX ---
+const toISODate = (date) => {
+  // If the date is valid, use it.
+  if (date) {
+    const validDate = new Date(date);
+    if (!isNaN(validDate)) {
+      return validDate.toISOString().split('T')[0];
+    }
+  }
+  // If date is null, undefined, or invalid, fallback to today.
+  return new Date().toISOString().split('T')[0];
+};
+// --- END OF FIX ---
 
 function generateSitemapXml(articles) {
   let xml = `<?xml version="1.0" encoding="UTF-8"?>`;
@@ -20,7 +31,7 @@ function generateSitemapXml(articles) {
     </url>
   `;
 
-  // 2. Add other static pages (like /create-article, if you want it indexed)
+  // 2. Add other static pages
   xml += `
     <url>
       <loc>${BASE_URL}/create-article</loc>
@@ -31,7 +42,7 @@ function generateSitemapXml(articles) {
 
   // 3. Add all dynamic Article pages
   articles.forEach(article => {
-    // Use updatedAt if it exists, otherwise createdAt
+    // This will now safely handle missing dates
     const lastMod = toISODate(article.updatedAt || article.createdAt);
     
     xml += `
@@ -48,30 +59,28 @@ function generateSitemapXml(articles) {
   return xml;
 }
 
-// This is the magic. It's a server-side-only function.
 export async function getServerSideProps({ res }) {
-  await dbConnect();
-  
-  // Fetch all articles, but only the fields we need
-  const articles = await Article.find({})
-    .select('slug updatedAt createdAt')
-    .sort({ createdAt: -1 });
+  try {
+    await dbConnect();
+    
+    const articles = await Article.find({})
+      .select('slug updatedAt createdAt')
+      .sort({ createdAt: -1 });
 
-  // Generate the sitemap XML
-  const sitemap = generateSitemapXml(articles);
+    const sitemap = generateSitemapXml(articles);
 
-  // Set the response headers
-  res.setHeader('Content-Type', 'text/xml');
-  
-  // Send the XML as the response
-  res.write(sitemap);
-  res.end();
+    res.setHeader('Content-Type', 'text/xml');
+    res.write(sitemap);
+    res.end();
 
-  // Return an empty props object
+  } catch (error) {
+    console.error('Error generating sitemap:', error);
+    res.statusCode = 500;
+    res.end('Internal Server Error');
+  }
+
   return { props: {} };
 }
 
-// This is just a dummy component so Next.js doesn't complain.
-// The real work happens in getServerSideProps.
 const Sitemap = () => {};
 export default Sitemap;
