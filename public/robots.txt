@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Disallow admin pages or API routes if needed
+# Disallow: /admin
+
+# Point to your sitemap (you would generate this)
+Sitemap: https://www.your-domain.com/sitemap.xml
