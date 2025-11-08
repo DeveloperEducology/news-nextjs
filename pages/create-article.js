@@ -1,10 +1,9 @@
-import { getSession } from "next-auth/react"; // 1. IMPORT THIS at the top of the file
+import { getSession } from "next-auth/react";
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import SeoHead from '../components/SeoHead';
 import dbConnect from '../lib/mongodb';
 import Article from '../models/Article';
-
 
 // Helper: Formats a Date object into 'YYYY-MM-DDTHH:MM' for the input
 const formatDateForInput = (date) => {
@@ -49,6 +48,7 @@ export default function CreateArticle({ categories }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showNewCategory, setShowNewCategory] = useState(false); // State to toggle new category input
+  const [isUploading, setIsUploading] = useState(false); // State for image upload
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -80,6 +80,59 @@ export default function CreateArticle({ categories }) {
     });
   };
 
+// ... (inside your CreateArticle component) ...
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      return; // No file selected
+    }
+
+    setIsUploading(true);
+    setError("");
+
+    try {
+      // 1. Ask our API for a pre-signed URL
+      const res = await fetch("/api/s3-upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: file.name,
+          type: file.type,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to get pre-signed URL.");
+
+      const { uploadUrl, imageUrl } = await res.json();
+
+      // 2. Upload the file *directly* to S3
+      // --- THIS IS THE FIX ---
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: {
+          // Now that the URL isn't signed with Content-Type,
+          // we MUST provide it in the headers.
+          "Content-Type": file.type 
+        },
+      });
+      // --- END OF FIX ---
+
+      if (!uploadRes.ok) throw new Error("Upload to S3 failed.");
+
+      // 3. Success! Set the image URL in our form data
+      setFormData((prev) => ({
+        ...prev,
+        featuredImage: imageUrl,
+      }));
+      
+    } catch (err) {
+      setError(`Upload failed: ${err.message}`);
+    }
+
+    setIsUploading(false);
+  };
   const handleParseJson = () => {
     setError('');
     if (!jsonInput) return;
@@ -215,9 +268,40 @@ export default function CreateArticle({ categories }) {
                 <label htmlFor="author" className="block text-sm font-medium text-gray-700">Author</label>
                 <input type="text" name="author" id="author" required className="mt-1 block w-full" value={formData.author} onChange={handleChange} />
               </div>
+              {/* --- Updated Featured Image Upload --- */}
               <div>
-                <label htmlFor="featuredImage" className="block text-sm font-medium text-gray-700">Featured Image URL</label>
-                <input type="text" name="featuredImage" id="featuredImage" placeholder="https://..." className="mt-1 block w-full" value={formData.featuredImage} onChange={handleChange} />
+                <label htmlFor="featuredImage" className="block text-sm font-medium text-gray-700">
+                  Featured Image
+                </label>
+                <input
+                  type="file"
+                  name="featuredImage"
+                  id="featuredImage"
+                  accept="image/png, image/jpeg, image/webp"
+                  className="mt-1 block w-full text-sm text-gray-500
+                             file:mr-4 file:rounded-md file:border-0
+                             file:bg-blue-50 file:px-4
+                             file:py-2 file:text-sm
+                             file:font-semibold file:text-blue-700
+                             hover:file:bg-blue-100"
+                  onChange={handleFileChange}
+                />
+                
+                {/* Show a loading spinner */}
+                {isUploading && <p className="mt-2 text-sm text-gray-500">Uploading...</p>}
+
+                {/* Show the URL field once the upload is complete, or if parsed from JSON */}
+                {formData.featuredImage && (
+                  <div className="mt-2">
+                    <label className="block text-xs text-gray-500">Image URL</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={formData.featuredImage}
+                      className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm text-sm"
+                    />
+                  </div>
+                )}
               </div>
             </div>
             <div>
@@ -289,10 +373,10 @@ export default function CreateArticle({ categories }) {
           <div>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-md border border-transparent bg-blue-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-blue-700"
+              disabled={isSubmitting || isUploading} // Disable if uploading image
+              className="w-full rounded-md border border-transparent bg-blue-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400"
             >
-              {isSubmitting ? 'Creating...' : 'Create Article'}
+              {isSubmitting ? 'Creating...' : (isUploading ? 'Uploading Image...' : 'Create Article')}
             </button>
           </div>
         </form>

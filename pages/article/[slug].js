@@ -12,16 +12,32 @@ export default function ArticlePage({ article }) {
     return <p>Loading...</p>;
   }
 
-  // Sanitize the HTML content
-  const sanitizedContent = DOMPurify.sanitize(article.content || "");
+  // --- THIS IS THE FINAL FIX ---
 
-  // Structured Data for SEO (Rich Snippets)
-  // --- FIX: Use summary, not excerpt ---
+  // 1. Clean the junk characters from the string.
+  // This regex finds all newlines, spaces, or &nbsp; characters
+  // that come *before* an HTML tag and removes them.
+  const cleanedContent = (article.content || "")
+    .replace(/(\n|\s|&nbsp;)+<g/g, '<') // Clean before <h2>
+    .replace(/(\n|\s|&nbsp;)+<p/g, '<p') // Clean before <p>
+    .replace(/(\n|\s|&nbsp;)+<h/g, '<h') // Clean before <h3>
+    .replace(/(\n|\s|&nbsp;)+<s/g, '<s') // Clean before <strong>
+    .replace(/(\n|\s|&nbsp;)+<h/g, '<h') // Clean before <hr>
+    .trim();
+
+  // 2. Now, sanitize the *clean* HTML.
+  const sanitizedContent = DOMPurify.sanitize(cleanedContent, {
+    ADD_TAGS: ['h2', 'h3', 'p', 'strong', 'em', 'hr', 'ul', 'ol', 'li', 'br', 'a'],
+    ADD_ATTR: ['href'] // Allows links to have an 'href'
+  });
+  // --- END OF FIX ---
+
+
   const schemaData = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     headline: article.title,
-    description: article.summary, // <-- FIXED
+    description: article.summary, 
     datePublished: article.createdAt,
     dateModified: article.updatedAt,
     author: {
@@ -32,14 +48,12 @@ export default function ArticlePage({ article }) {
 
   return (
     <Fragment>
-      {/* --- 1. USE SeoHead FOR ALL PRIMARY TAGS --- */}
       <SeoHead
         title={article.title}
-        description={article.summary} // <-- FIXED
+        description={article.summary}
         ogImage={article.featuredImage}
       />
 
-      {/* --- 2. USE A SMALL Head FOR PAGE-SPECIFIC TAGS ONLY --- */}
       <Head>
         <meta property="og:type" content="article" />
         <script
@@ -48,7 +62,6 @@ export default function ArticlePage({ article }) {
         />
       </Head>
 
-      {/* This is the centered, styled article layout */}
       <div className="container mx-auto max-w-3xl px-4 py-8">
         <article className="rounded-lg bg-white p-6 shadow-lg md:p-10">
           <h1 className="mb-4 text-3xl font-extrabold text-gray-900 md:text-4xl">
@@ -68,19 +81,15 @@ export default function ArticlePage({ article }) {
               height={600}
               className="mb-6 w-full rounded-lg object-cover"
               priority
-              unoptimized={true} // Keep this to allow all domains
+              unoptimized={true} 
             />
           )}
 
-          {/* This 'prose' class will now use "Noto Sans Telugu"
-              from your tailwind.config.js file
-          */}
           <div
             className="prose prose-lg max-w-none prose-img:rounded-lg"
             dangerouslySetInnerHTML={{ __html: sanitizedContent }}
           />
 
-          {/* --- 3. RE-ADDED THE TAGS SECTION --- */}
           {article.tags && article.tags.length > 0 && (
             <div className="mt-8 border-t pt-6">
               <h3 className="text-lg font-medium text-gray-900">Tags:</h3>
@@ -88,7 +97,6 @@ export default function ArticlePage({ article }) {
                 {article.tags.map((tag) => (
                   <a
                     key={tag}
-                    // href={`/tag/${tag}`} // Link for your tag page
                     className="cursor-pointer rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 hover:bg-blue-200"
                   >
                     {tag}
@@ -103,21 +111,37 @@ export default function ArticlePage({ article }) {
   );
 }
 
-// --- Your Data Fetching Functions (No Change Needed) ---
+// --- Data Fetching (No Change) ---
 
 export async function getStaticPaths() {
   await dbConnect();
-  const articles = await Article.find({}, "slug");
+  const now = new Date();
+  const articles = await Article.find({
+    $or: [
+      { status: 'published', publishedDate: { $lte: now } },
+      { status: { $exists: false } }
+    ]
+  }, "slug");
+  
   const paths = articles.map((article) => ({
     params: { slug: article.slug },
   }));
+  
   return { paths, fallback: "blocking" };
 }
 
 export async function getStaticProps({ params }) {
   await dbConnect();
   const { slug } = params;
-  const result = await Article.findOne({ slug: slug });
+
+  const now = new Date();
+  const result = await Article.findOne({ 
+    slug: slug,
+    $or: [
+      { status: 'published', publishedDate: { $lte: now } },
+      { status: { $exists: false } }
+    ]
+  });
 
   if (!result) {
     return { notFound: true };
@@ -125,14 +149,17 @@ export async function getStaticProps({ params }) {
 
   const article = result.toObject();
   article._id = article._id.toString();
+  
   if (article.publishedDate) {
     article.createdAt = article.publishedDate.toString();
   } else if (article.createdAt) {
     article.createdAt = article.createdAt.toString();
   }
+  
   if (article.updatedAt) {
     article.updatedAt = article.updatedAt.toString();
   }
+  
   delete article.publishedDate;
 
   return {

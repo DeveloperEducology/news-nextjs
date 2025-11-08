@@ -25,6 +25,9 @@ import Image from 'next/image';
 
 export default function Header() {
   const { data: session, status } = useSession(); // Get session data
+
+  console.log(session)
+
   const isLoading = status === "loading";
 
   return (
@@ -43,7 +46,7 @@ export default function Header() {
             // User is Signed In
             <>
               {/* --- THIS IS THE CHANGE --- */}
-              {session.user.role === 'admin' && (
+              {session?.user.role === 'admin' && (
                 <Link href="/admin" legacyBehavior>
                   <a className="text-sm font-medium text-red-600 hover:text-red-800">
                     Dashboard
