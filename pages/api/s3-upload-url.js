@@ -3,6 +3,15 @@ import { authOptions } from "./auth/[...nextauth]";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+// Helper: Creates a URL-friendly slug
+const slugify = (str) =>
+  str
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 const s3Client = new S3Client({
   region: process.env.AWS_BUCKET_REGION,
   credentials: {
@@ -29,17 +38,22 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: "Missing filename or type" });
     }
 
-    const uniqueFilename = `${Date.now()}-${filename}`;
+    // --- THIS IS THE UPDATE ---
+    // Get the base filename without its original extension
+    const baseFilename = filename.split('.').slice(0, -1).join('.');
+    
+    // Determine the correct extension from the 'type' (e.g., 'image/webp' -> 'webp')
+    const extension = type.split('/')[1];
+    
+    // Create a clean, unique filename
+    const uniqueFilename = `${Date.now()}-${slugify(baseFilename)}.${extension}`;
+    // --- END OF UPDATE ---
 
-    // --- THIS IS THE FIX ---
-    // We REMOVE the ContentType from the command.
-    // This creates a URL that lets the client set the ContentType.
     const command = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: uniqueFilename,
-      // ContentType: type, // <-- THIS LINE IS REMOVED
+      // ContentType is NOT in the command
     });
-    // --- END OF FIX ---
 
     const uploadUrl = await getSignedUrl(s3Client, command, {
       expiresIn: 60,

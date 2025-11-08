@@ -33,25 +33,28 @@ const ArticleSchema = new mongoose.Schema(
       type: String, 
       default: '',
     },
+    // --- ADD THIS FIELD ---
+    featuredVideo: {
+      type: String,
+      default: '',
+    },
+    // --- END ---
     tags: [{ 
       type: String, 
       trim: true 
     }],
-    
-    // --- NEW FIELDS ---
     publishedDate: {
       type: Date,
-      default: Date.now, // Defaults to 'now'
+      default: Date.now,
     },
     status: {
       type: String,
       enum: ['draft', 'published'],
       default: 'published',
     },
-    // --- END NEW FIELDS ---
   },
   {
-    timestamps: true, // This will automatically add createdAt and updatedAt
+    timestamps: true,
   }
 );
 
