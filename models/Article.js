@@ -13,12 +13,10 @@ const ArticleSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
-    // --- THIS IS THE UPDATE ---
-    summary: { // Changed from 'excerpt'
+    summary: {
       type: String,
       required: [true, 'Please provide a summary.'],
     },
-    // --- END OF UPDATE ---
     content: {
       type: String,
       required: [true, 'Please provide content.'],
@@ -31,14 +29,26 @@ const ArticleSchema = new mongoose.Schema(
       type: String,
       default: 'General',
     },
+    featuredImage: {
+      type: String, 
+      default: '',
+    },
     tags: [{ 
       type: String, 
       trim: true 
     }],
-    featuredImage: { // Make sure this is in your model
-      type: String, 
-      default: '',
+    
+    // --- NEW FIELDS ---
+    publishedDate: {
+      type: Date,
+      default: Date.now, // Defaults to 'now'
     },
+    status: {
+      type: String,
+      enum: ['draft', 'published'],
+      default: 'published',
+    },
+    // --- END NEW FIELDS ---
   },
   {
     timestamps: true, // This will automatically add createdAt and updatedAt

@@ -1,8 +1,24 @@
+import { getSession } from "next-auth/react"; // 1. IMPORT THIS at the top of the file
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import SeoHead from '../components/SeoHead';
+import dbConnect from '../lib/mongodb';
+import Article from '../models/Article';
 
-// A simple utility to create a URL-friendly slug
+
+// Helper: Formats a Date object into 'YYYY-MM-DDTHH:MM' for the input
+const formatDateForInput = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+// Helper: Creates a URL-friendly slug
 const slugify = (str) =>
   str
     .toLowerCase()
@@ -11,30 +27,45 @@ const slugify = (str) =>
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-export default function CreateArticle() {
+// The component now receives 'categories' as a prop
+export default function CreateArticle({ categories }) {
   const router = useRouter();
+  
   const [formData, setFormData] = useState({
     title: '',
     slug: '',
     author: '',
-    category: '',
+    category: '', // This will be the selected category
+    newCategory: '', // For the 'Add New' text input
     summary: '',
     featuredImage: '',
     content: '',
-    tags: '', // Form expects a comma-separated string
+    tags: '',
+    publishedDate: formatDateForInput(new Date()), // Default to now
+    status: 'published',
   });
   
-  // --- NEW STATE FOR THE JSON INPUT ---
   const [jsonInput, setJsonInput] = useState('');
-  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showNewCategory, setShowNewCategory] = useState(false); // State to toggle new category input
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    // Special logic for category dropdown
+    if (name === 'category') {
+      if (value === '__NEW__') {
+        setShowNewCategory(true);
+        setFormData((prev) => ({ ...prev, category: '' }));
+      } else {
+        setShowNewCategory(false);
+        setFormData((prev) => ({ ...prev, category: value, newCategory: '' }));
+      }
+      return;
+    }
     
     setFormData((prev) => {
-      // If changing the title, also update the slug
       if (name === 'title') {
         return {
           ...prev,
@@ -49,38 +80,31 @@ export default function CreateArticle() {
     });
   };
 
-  // --- NEW HANDLER FOR PARSING THE JSON ---
   const handleParseJson = () => {
     setError('');
-    if (!jsonInput) {
-      setError('Please paste a JSON object first.');
-      return;
-    }
+    if (!jsonInput) return;
 
     try {
       const parsedData = JSON.parse(jsonInput);
-      
-      // Auto-generate slug as a fallback
-      const generatedSlug = slugify(parsedData.title || '');
-      
-      // Convert tags array (if it exists) to a comma-separated string
       const tagsString = (parsedData.tags && Array.isArray(parsedData.tags))
         ? parsedData.tags.join(', ')
         : '';
 
-      // Set the form data from the parsed object
       setFormData({
         title: parsedData.title || '',
-        slug: parsedData.slug || generatedSlug, // Use parsed slug, or fallback
+        slug: parsedData.slug || slugify(parsedData.title || ''),
         author: parsedData.author || '',
         category: parsedData.category || '',
+        newCategory: '',
         summary: parsedData.summary || '',
         featuredImage: parsedData.featuredImage || '',
         content: parsedData.content || '',
-        tags: tagsString, // Use the converted tags string
+        tags: tagsString,
+        publishedDate: formatDateForInput(parsedData.publishedDate || new Date()),
+        status: parsedData.status || 'published',
       });
       
-      // Clear the text area after success
+      setShowNewCategory(false);
       setJsonInput('');
 
     } catch (err) {
@@ -93,7 +117,13 @@ export default function CreateArticle() {
     setIsSubmitting(true);
     setError('');
 
-    // Prepare data to send: convert tags string back to array
+    const finalCategory = showNewCategory ? formData.newCategory : formData.category;
+    if (!finalCategory) {
+      setError('Please select or add a category.');
+      setIsSubmitting(false);
+      return;
+    }
+
     const tagsArray = formData.tags.split(',')
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0);
@@ -101,20 +131,23 @@ export default function CreateArticle() {
     const dataToSend = {
       ...formData,
       tags: tagsArray,
+      category: finalCategory,
+      publishedDate: new Date(formData.publishedDate), // Convert string back to Date
     };
+    
+    // Remove temporary fields
+    delete dataToSend.newCategory;
 
     try {
       const res = await fetch('/api/articles', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dataToSend),
       });
 
       if (res.ok) {
         alert('Article created successfully!');
-        router.push('/');
+        router.push('/admin'); // Redirect to dashboard
       } else {
         const data = await res.json();
         setError(data.error || 'Failed to create article.');
@@ -131,181 +164,166 @@ export default function CreateArticle() {
       <div className="container mx-auto max-w-3xl px-4 py-8">
         <h1 className="mb-6 text-3xl font-bold">Create a New Article</h1>
 
-        {/* --- NEW JSON PARSER SECTION --- */}
+        {/* --- JSON PARSER SECTION --- */}
         <div className="mb-8 rounded-lg bg-white p-8 shadow-lg">
           <h2 className="text-xl font-bold mb-4">Quick Add via JSON</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Paste a full article JSON object here to auto-fill the fields below.
-            Fields like `_id` and `publishedDate` will be ignored.
-          </p>
           <textarea
-            rows="10"
+            rows="5"
             className="mt-1 block w-full rounded-md border-gray-300 font-mono text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             placeholder='{ "title": "My Title", "content": "...", "summary": "...", ... }'
             value={jsonInput}
             onChange={(e) => setJsonInput(e.target.value)}
           />
           <button
-            type="button" // Important: not "submit"
+            type="button"
             onClick={handleParseJson}
-            className="mt-4 rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className="mt-4 rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
           >
             Parse and Fill Form
           </button>
         </div>
-        {/* --- END OF JSON PARSER SECTION --- */}
-
         
+        {/* --- MAIN FORM --- */}
         <form onSubmit={handleSubmit} className="space-y-6 rounded-lg bg-white p-8 shadow-lg">
-          {/* Title */}
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-              Title
-            </label>
-            <input
-              type="text"
-              name="title"
-              id="title"
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              value={formData.title}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* Slug (Read-only, auto-generated) */}
-          <div>
-            <label htmlFor="slug" className="block text-sm font-medium text-gray-700">
-              Slug (auto-generated)
-            </label>
-            <input
-              type="text"
-              name="slug"
-              id="slug"
-              readOnly
-              className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm"
-              value={formData.slug}
-            />
-          </div>
-
-          {/* Author & Category (in a grid) */}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          
+          {/* --- Main Content --- */}
+          <section className="space-y-6">
+            <h2 className="text-xl font-semibold text-gray-900 border-b pb-2">Main Content</h2>
             <div>
-              <label htmlFor="author" className="block text-sm font-medium text-gray-700">
-                Author
-              </label>
-              <input
-                type="text"
-                name="author"
-                id="author"
-                required
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                value={formData.author}
-                onChange={handleChange}
-              />
+              <label htmlFor="title" className="block text-sm font-medium text-gray-700">Title</label>
+              <input type="text" name="title" id="title" required className="mt-1 block w-full" value={formData.title} onChange={handleChange} />
             </div>
             <div>
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-                Category
-              </label>
-              <input
-                type="text"
+              <label htmlFor="slug" className="block text-sm font-medium text-gray-700">Slug (auto-generated)</label>
+              <input type="text" name="slug" id="slug" readOnly className="mt-1 block w-full bg-gray-100" value={formData.slug} />
+            </div>
+            <div>
+              <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content (HTML)</label>
+              <textarea name="content" id="content" rows="10" required className="mt-1 block w-full font-mono" value={formData.content} onChange={handleChange} />
+            </div>
+            <div>
+              <label htmlFor="summary" className="block text-sm font-medium text-gray-700">Summary (Excerpt)</label>
+              <textarea name="summary" id="summary" rows="3" required className="mt-1 block w-full" value={formData.summary} onChange={handleChange} />
+            </div>
+          </section>
+
+          {/* --- Metadata --- */}
+          <section className="space-y-6 pt-6 border-t">
+            <h2 className="text-xl font-semibold text-gray-900 border-b pb-2">Metadata</h2>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div>
+                <label htmlFor="author" className="block text-sm font-medium text-gray-700">Author</label>
+                <input type="text" name="author" id="author" required className="mt-1 block w-full" value={formData.author} onChange={handleChange} />
+              </div>
+              <div>
+                <label htmlFor="featuredImage" className="block text-sm font-medium text-gray-700">Featured Image URL</label>
+                <input type="text" name="featuredImage" id="featuredImage" placeholder="https://..." className="mt-1 block w-full" value={formData.featuredImage} onChange={handleChange} />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="category" className="block text-sm font-medium text-gray-700">Category</label>
+              <select
                 name="category"
                 id="category"
-                required
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                value={formData.category}
+                className="mt-1 block w-full"
+                value={showNewCategory ? '__NEW__' : formData.category}
                 onChange={handleChange}
-              />
+              >
+                <option value="" disabled>-- Select a category --</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                <option value="__NEW__">-- Add New Category --</option>
+              </select>
             </div>
-          </div>
-          
-          {/* Featured Image URL */}
-          <div>
-            <label htmlFor="featuredImage" className="block text-sm font-medium text-gray-700">
-              Featured Image URL
-            </label>
-            <input
-              type="text"
-              name="featuredImage"
-              id="featuredImage"
-              placeholder="https://..."
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              value={formData.featuredImage}
-              onChange={handleChange}
-            />
-          </div>
-          
-          {/* Tags */}
-          <div>
-            <label htmlFor="tags" className="block text-sm font-medium text-gray-700">
-              Tags (comma-separated)
-            </label>
-            <input
-              type="text"
-              name="tags"
-              id="tags"
-              placeholder="e.g., technology, google, ai"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              value={formData.tags}
-              onChange={handleChange}
-            />
-          </div>
-          
-          {/* Summary */}
-          <div>
-            <label htmlFor="summary" className="block text-sm font-medium text-gray-700">
-              Summary
-            </label>
-            <textarea
-              name="summary"
-              id="summary"
-              rows="3"
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              value={formData.summary}
-              onChange={handleChange}
-            ></textarea>
-          </div>
+            {showNewCategory && (
+              <div>
+                <label htmlFor="newCategory" className="block text-sm font-medium text-gray-700">New Category Name</label>
+                <input
+                  type="text"
+                  name="newCategory"
+                  id="newCategory"
+                  className="mt-1 block w-full"
+                  value={formData.newCategory}
+                  onChange={handleChange}
+                />
+              </div>
+            )}
+            <div>
+              <label htmlFor="tags" className="block text-sm font-medium text-gray-700">Tags (comma-separated)</label>
+              <input type="text" name="tags" id="tags" placeholder="e.g., technology, google, ai" className="mt-1 block w-full" value={formData.tags} onChange={handleChange} />
+            </div>
+          </section>
 
-          {/* Content (HTML) */}
-          <div>
-            <label htmlFor="content" className="block text-sm font-medium text-gray-700">
-              Content (HTML)
-            </label>
-            <p className="text-xs text-gray-500">
-              Use HTML tags for formatting. (e.g., `&lt;p&gt;`, `&lt;h2&gt;`, `&lt;ul&gt;`)
-            </p>
-            <textarea
-              name="content"
-              id="content"
-              rows="10"
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 font-mono shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              value={formData.content}
-              onChange={handleChange}
-            />
-          </div>
+          {/* --- Publishing --- */}
+          <section className="space-y-6 pt-6 border-t">
+            <h2 className="text-xl font-semibold text-gray-900 border-b pb-2">Publishing</h2>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div>
+                <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+                <select name="status" id="status" className="mt-1 block w-full" value={formData.status} onChange={handleChange}>
+                  <option value="published">Published</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="publishedDate" className="block text-sm font-medium text-gray-700">Published Date & Time</label>
+                <input
+                  type="datetime-local"
+                  name="publishedDate"
+                  id="publishedDate"
+                  className="mt-1 block w-full"
+                  value={formData.publishedDate}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+          </section>
           
-          {/* Error Message */}
           {error && (
             <div className="rounded-md bg-red-50 p-4">
               <p className="text-sm font-medium text-red-800">{error}</p>
             </div>
           )}
 
-          {/* Submit Button */}
           <div>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-md border border-transparent bg-blue-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400"
+              className="w-full rounded-md border border-transparent bg-blue-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-blue-700"
             >
-              {isSubmitting ? 'Submitting...' : 'Create Article'}
+              {isSubmitting ? 'Creating...' : 'Create Article'}
             </button>
           </div>
         </form>
       </div>
     </>
   );
+}
+
+// We now fetch the categories from the DB
+export async function getServerSideProps(context) {
+  const session = await getSession(context);
+
+  if (!session || session.user.role !== "admin") {
+    return {
+      redirect: {
+        destination: "/login",
+        permanent: false,
+      },
+    };
+  }
+  
+  // Fetch unique categories from the database
+  await dbConnect();
+  const categories = await Article.distinct("category");
+  // Filter out any null/empty categories
+  const sortedCategories = categories.filter(cat => cat).sort();
+
+  return {
+    props: {
+      session, // Pass session to the page
+      categories: sortedCategories, // Pass the categories
+    },
+  };
 }
