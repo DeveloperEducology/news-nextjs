@@ -38,7 +38,14 @@ export default function Header() {
         </Link>
         
         <nav className="flex items-center gap-4">
-         
+         <Link href="/gallery" className="text-sm font-medium text-gray-600 hover:text-blue-600">
+    Gallery
+  </Link>
+  {/* --- ADD THIS LINK --- */}
+          <Link href="/shorts" className="text-sm font-medium text-gray-600 hover:text-blue-600">
+            Shorts
+          </Link>
+          {/* --- END OF LINK --- */}
           {/* --- AUTHENTICATION BUTTONS --- */}
           {isLoading ? (
             <div className="h-8 w-16 animate-pulse rounded-md bg-gray-200"></div>

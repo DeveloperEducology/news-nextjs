@@ -1,11 +1,12 @@
 import '@/styles/globals.css';
 import Layout from '../components/layout/Layout';
-import { SessionProvider } from "next-auth/react";
+import { SessionProvider } from "next-auth/react"; // <-- IMPORT
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Script from 'next/script';
 // import * as gtag from '../lib/gtag';
 
+// THIS IS THE CORRECT ORDER
 export default function App({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter();
 
@@ -19,16 +20,12 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
   //   };
   // }, [router.events]);
 
-  // --- THIS IS THE UPDATE ---
-  // Check if the current page is the shorts page
-  const isShortsPage = router.pathname === '/shorts';
-  // --- END OF UPDATE ---
-
   return (
+    // 1. SessionProvider MUST be on the outside
     <SessionProvider session={session}>
       
-      {/* Analytics Scripts
-      <Script
+      {/* Analytics Scripts */}
+      {/* <Script
         strategy="afterInteractive"
         src={`https://www.googletagmanager.com/gtag/js?id=${gtag.GA_TRACKING_ID}`}
       />
@@ -47,16 +44,10 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
         }}
       />
        */}
-      {/* --- THIS IS THE UPDATE --- */}
-      {/* Conditionally render the Layout */}
-      {isShortsPage ? (
-        <Component {...pageProps} /> // Render the page with NO layout
-      ) : (
-        <Layout>
-          <Component {...pageProps} /> {/* Render other pages WITH the layout */}
-        </Layout>
-      )}
-      {/* --- END OF UPDATE --- */}
+      {/* 2. Layout is INSIDE the provider */}
+      <Layout>
+        <Component {...pageProps} />
+      </Layout>
       
     </SessionProvider>
   );

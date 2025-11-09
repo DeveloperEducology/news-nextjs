@@ -34,7 +34,7 @@ function SeoHead({ title, description }) {
   const fullTitle = `${title} | ${siteTitle}`;
   return (
     <Head>
-      <title>{fullTitle}</title>
+      {/* <title>{fullTitle}</title> */}
       <meta name="description" content={description} />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <link rel="icon" href="/favicon.ico" />
@@ -47,7 +47,7 @@ function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
       <div className="container mx-auto max-w-7xl px-4 py-4">
         <h1 className="text-2xl font-bold text-blue-600">
-          <Link href="/">NewsGrid</Link>
+          {/* <Link href="/">NewsGrid</Link> */}
         </h1>
       </div>
     </header>
@@ -95,15 +95,15 @@ export default function Home({ initialArticles, totalPosts, headlines }) {
 
       <Header />
 
-      <div className="container mx-auto max-w-7xl px-4 py-8">
+      <div className="container mx-auto max-w-6xl px-4 py-8">
         {/* Two-column layout */}
-        <div className="lg:grid lg:grid-cols-3 lg:gap-8">
+        <div className="lg:grid lg:grid-cols-2 lg:gap-8">
 
           {/* === COLUMN 1: MAIN CONTENT (Scrolls) === */}
           <div className="lg:col-span-2">
-            <h1 className="mb-6 text-3xl font-bold text-gray-900">
+            {/* <h1 className="mb-6 text-3xl font-bold text-gray-900">
               Latest News
-            </h1>
+            </h1> */}
             
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {articles &&
@@ -126,7 +126,7 @@ export default function Home({ initialArticles, totalPosts, headlines }) {
           </div>
 
           {/* === COLUMN 2: SIDEBAR (Sticky) === */}
-          <div className="lg:col-span-1">
+          {/* <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-24">
               <div className="mt-8 lg:mt-0">
                 <h2 className="text-xl font-bold text-gray-900">
@@ -146,7 +146,7 @@ export default function Home({ initialArticles, totalPosts, headlines }) {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
           
         </div>
       </div>
