@@ -95,8 +95,10 @@ export default function CreateArticle({ categories }) {
 
     // --- Compression Step ---
     const options = {
-      maxSizeMB: 1,
-      maxWidthOrHeight: 1920,
+      // maxSizeMB: 1,
+      maxSizeMB: 0.097,
+      // maxWidthOrHeight: 1920,
+      maxWidthOrHeight: 1080,
       useWebWorker: true,
       fileType: "image/webp", // Convert to WebP
       initialQuality: 0.9,

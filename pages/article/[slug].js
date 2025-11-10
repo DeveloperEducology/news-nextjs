@@ -6,32 +6,55 @@ import { Fragment } from "react";
 import { format } from "date-fns";
 import DOMPurify from "isomorphic-dompurify";
 import SeoHead from "../../components/SeoHead";
+import ShareButtons from "../../components/ShareButtons"; // <-- 1. IMPORT SHARE BUTTONS
+
+// --- Define Your Trusted Domains ---
+const OPTIMIZED_DOMAINS = [
+  'cakeimages.s3.ap-northeast-2.amazonaws.com',
+  'via.placeholder.com',
+];
 
 export default function ArticlePage({ article }) {
   if (!article) {
     return <p>Loading...</p>;
   }
 
-  // --- THIS IS THE FINAL FIX ---
+  // --- Check if image is external ---
+  let isExternalDomain = true;
+  if (article.featuredImage) {
+    try {
+      const url = new URL(article.featuredImage);
+      if (OPTIMIZED_DOMAINS.includes(url.hostname)) {
+        isExternalDomain = false;
+      }
+    } catch (e) {
+      isExternalDomain = true;
+    }
+  }
 
-  // 1. Clean the junk characters from the string.
-  // This regex finds all newlines, spaces, or &nbsp; characters
-  // that come *before* an HTML tag and removes them.
+  // --- Content Cleaning Logic ---
   const cleanedContent = (article.content || "")
-    .replace(/(\n|\s|&nbsp;)+<g/g, '<') // Clean before <h2>
-    .replace(/(\n|\s|&nbsp;)+<p/g, '<p') // Clean before <p>
-    .replace(/(\n|\s|&nbsp;)+<h/g, '<h') // Clean before <h3>
-    .replace(/(\n|\s|&nbsp;)+<s/g, '<s') // Clean before <strong>
-    .replace(/(\n|\s|&nbsp;)+<h/g, '<h') // Clean before <hr>
+    .replace(/(\n|\s|&nbsp;)+<g/g, '<')
+    .replace(/(\n|\s|&nbsp;)+<p/g, '<p')
+    .replace(/(\n|\s|&nbsp;)+<h/g, '<h')
+    .replace(/(\n|\s|&nbsp;)+<s/g, '<s')
+    .replace(/(\n|\s|&nbsp;)+<h/g, '<h')
     .trim();
 
-  // 2. Now, sanitize the *clean* HTML.
+  // --- 2. UPDATE DOMPURIFY TO ALLOW EMBEDS ---
   const sanitizedContent = DOMPurify.sanitize(cleanedContent, {
-    ADD_TAGS: ['h2', 'h3', 'p', 'strong', 'em', 'hr', 'ul', 'ol', 'li', 'br', 'a'],
-    ADD_ATTR: ['href'] // Allows links to have an 'href'
+    ADD_TAGS: [
+      'h2', 'h3', 'p', 'strong', 'em', 'hr', 'ul', 'ol', 'li', 'br', 'a',
+      'blockquote', // For Twitter/Instagram
+      'script',     // For Twitter/Instagram
+      'iframe'      // For YouTube/Vimeo
+    ],
+    ADD_ATTR: [
+      'href', 'class', 'async', 'src', 'cite', 'data-width', 
+      'data-height', 'style', 'frameborder', 'scrolling'
+    ],
   });
-  // --- END OF FIX ---
-
+  // --- End of Update ---
 
   const schemaData = {
     "@context": "https://schema.org",
@@ -60,6 +83,9 @@ export default function ArticlePage({ article }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaData) }}
         />
+        {/* Instagram/Twitter embed script. This is needed ONCE per page. */}
+        <script async src="//www.instagram.com/embed.js"></script>
+        <script async src="https://platform.twitter.com/widgets.js" charSet="utf-8"></script>
       </Head>
 
       <div className="container mx-auto max-w-3xl px-4 py-8">
@@ -73,6 +99,12 @@ export default function ArticlePage({ article }) {
             {format(new Date(article.createdAt), "MMMM d, yyyy")}
           </p>
 
+          {/* --- 3. ADD SHARE BUTTONS --- */}
+          <div className="mb-6">
+            <ShareButtons title={article.title} slug={article.slug} />
+          </div>
+          {/* --- END SHARE BUTTONS --- */}
+
           {article.featuredImage && (
             <Image
               src={article.featuredImage}
@@ -81,10 +113,11 @@ export default function ArticlePage({ article }) {
               height={600}
               className="mb-6 w-full rounded-lg object-cover"
               priority
-              unoptimized={true} 
+              unoptimized={isExternalDomain} 
             />
           )}
 
+          {/* This will now render your HTML content AND embeds */}
           <div
             className="prose prose-lg max-w-none prose-img:rounded-lg"
             dangerouslySetInnerHTML={{ __html: sanitizedContent }}
@@ -112,7 +145,6 @@ export default function ArticlePage({ article }) {
 }
 
 // --- Data Fetching (No Change) ---
-
 export async function getStaticPaths() {
   await dbConnect();
   const now = new Date();

@@ -28,6 +28,9 @@ const GallerySchema = new mongoose.Schema(
       required: [true, 'Please provide a featured cover image.'],
     },
     images: [ImageSubSchema], // Array of images
+     content: {
+      type: String,
+    },
     status: {
       type: String,
       enum: ['draft', 'published'],

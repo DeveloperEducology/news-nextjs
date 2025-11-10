@@ -19,6 +19,7 @@ export default function CreateGallery() {
     title: '',
     slug: '',
     summary: '',
+    content: '',
     featuredImage: '',
   });
   const [galleryImages, setGalleryImages] = useState([]); // Array of { imageUrl, caption }
@@ -50,6 +51,36 @@ export default function CreateGallery() {
 
     return imageUrl;
   };
+//low quality and less memory
+  // const uploadFileToS3 = async (file) => {
+  //   // 1. Compress
+  //   const options = {
+  //     maxSizeMB: 0.097, // <-- Target < 100kb
+  //     maxWidthOrHeight: 1080, // <-- RECOMMENDED CHANGE: Smaller dimensions = better quality at small size
+  //     useWebWorker: true,
+  //     fileType: 'image/webp',
+  //     initialQuality: 0.8,
+  //   };
+  //   const compressedFile = await imageCompression(file, options);
+
+  //   // 2. Get URL
+  //   const res = await fetch("/api/s3-upload-url", {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify({ filename: file.name, type: compressedFile.type }),
+  //   });
+  //   if (!res.ok) throw new Error("Failed to get upload URL");
+  //   const { uploadUrl, imageUrl } = await res.json();
+
+  //   // 3. Upload
+  //   await fetch(uploadUrl, {
+  //     method: "PUT",
+  //     body: compressedFile,
+  //     headers: { "Content-Type": compressedFile.type },
+  //   });
+
+  //   return imageUrl;
+  // };
 
   // --- HANDLERS ---
   const handleChange = (e) => {
@@ -135,6 +166,11 @@ export default function CreateGallery() {
          <div>
             <label className="block text-sm font-medium">Summary (SEO Description)</label>
             <textarea name="summary" rows="3" className="w-full mt-1 border p-2 rounded" value={formData.summary} onChange={handleChange} />
+        </div>
+        {/* content */}
+         <div>
+            <label className="block text-sm font-medium">Content</label>
+            <textarea name="content" rows="3" className="w-full mt-1 border p-2 rounded" value={formData.content} onChange={handleChange} />
         </div>
 
         {/* Featured Image */}

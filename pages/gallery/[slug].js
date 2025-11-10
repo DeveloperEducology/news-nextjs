@@ -55,10 +55,11 @@ export default function SingleGallery({ gallery }) {
             ))}
             </Swiper>
         </div>
-        
+         
         <div className="mt-8 text-center">
              <a href="/gallery" className="text-blue-600 hover:underline">← Back to all galleries</a>
         </div>
+        {gallery.content && <p className="text-left text-gray-600 mb-8 max-w-2xl mx-auto">{gallery.content}</p>}
       </div>
     </>
   );
