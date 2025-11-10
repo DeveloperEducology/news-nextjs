@@ -1,7 +1,7 @@
 import dbConnect from '../lib/mongodb';
 import Article from '../models/Article';
 
-const BASE_URL = 'https://news-nextjs.onrender.com';
+const BASE_URL = 'https://www.telugushorts.com';
 
 // Helper function to format date to YYYY-MM-DD
 // --- THIS IS THE FIX ---
