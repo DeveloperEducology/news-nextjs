@@ -24,7 +24,8 @@ export default function SeoHead({ title, description, ogImage }) {
       <meta property="og:image" content={pageOgImage} />
       <meta property="og:site_name" content={siteName} />
       <meta property="og:type" content="website" />
-<meta name="google-site-verification" content="bw0kT6WT15z5UrQngna89uTbskXuXMl2KBs79K2SCSQ" />
+      <meta name="google-site-verification" content="bw0kT6WT15z5UrQngna89uTbskXuXMl2KBs79K2SCSQ" />
+
       {/* === Twitter Cards === */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={pageTitle} />
