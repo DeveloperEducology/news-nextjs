@@ -5,4 +5,4 @@ Allow: /
 # Disallow: /admin
 
 # Point to your sitemap (you would generate this)
-Sitemap: https://news-nextjs.onrender.com/sitemap.xml
+Sitemap: https://www.telugushorts.com/sitemap.xml
