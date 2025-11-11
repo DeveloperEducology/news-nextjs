@@ -14,17 +14,19 @@ const slugify = (str) =>
 export default function EditGalleryPage({ gallery }) {
   const router = useRouter();
   
-  // 1. ADD 'content' TO THE INITIAL STATE
+  // Initialize state with existing gallery data
   const [formData, setFormData] = useState({
     title: gallery.title,
     slug: gallery.slug,
     summary: gallery.summary,
-    content: gallery.content || '', // <-- ADDED
+    content: gallery.content || '', // Added content field
     featuredImage: gallery.featuredImage,
     status: gallery.status,
   });
   
+  // This state holds the array of image objects
   const [galleryImages, setGalleryImages] = useState(gallery.images);
+  
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
@@ -67,6 +69,7 @@ export default function EditGalleryPage({ gallery }) {
     setIsUploading(false);
   };
 
+  // This function ADDS images to the existing list
   const handleGalleryImages = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -76,7 +79,6 @@ export default function EditGalleryPage({ gallery }) {
     try {
       const uploadPromises = files.map(uploadFileToS3);
       const urls = await Promise.all(uploadPromises);
-      // Create new image objects (caption is blank by default)
       const newImages = urls.map(url => ({ imageUrl: url, caption: '' }));
       // This appends the new images to the existing ones
       setGalleryImages(prev => [...prev, ...newImages]);
@@ -85,10 +87,20 @@ export default function EditGalleryPage({ gallery }) {
     setIsUploading(false);
   };
 
+  // This function REMOVES an image from the list
   const removeImage = (indexToRemove) => {
     if (confirm('Are you sure you want to remove this image? This is permanent.')) {
       setGalleryImages(prev => prev.filter((_, index) => index !== indexToRemove));
     }
+  };
+
+  // This function updates the caption for a specific image
+  const handleImageCaptionChange = (index, newCaption) => {
+    setGalleryImages(prev => 
+      prev.map((image, i) => 
+        i === index ? { ...image, caption: newCaption } : image
+      )
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -99,12 +111,11 @@ export default function EditGalleryPage({ gallery }) {
        const res = await fetch(`/api/galleries/${gallery._id}`, {
          method: 'PUT', // Use PUT for update
          headers: { 'Content-Type': 'application/json' },
-         // The ...formData spread will now automatically include 'content'
          body: JSON.stringify({ ...formData, images: galleryImages }),
        });
        if (res.ok) {
          alert("Gallery Updated!");
-         router.push('/admin');
+         router.push('/admin'); // Go back to the dashboard
        } else {
          throw new Error("API Error: Failed to update gallery");
        }
@@ -138,12 +149,10 @@ export default function EditGalleryPage({ gallery }) {
             <textarea name="summary" rows="3" className="w-full mt-1 border p-2 rounded" value={formData.summary} onChange={handleChange} />
         </div>
         
-        {/* --- 2. ADD THE CONTENT TEXTAREA --- */}
         <div>
             <label className="block text-sm font-medium">Content (HTML)</label>
             <textarea name="content" rows="10" className="w-full mt-1 border p-2 rounded font-mono" value={formData.content} onChange={handleChange} />
         </div>
-        {/* --- END --- */}
         
          <div>
             <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
@@ -162,21 +171,28 @@ export default function EditGalleryPage({ gallery }) {
         </div>
 
          <div className="border-t pt-4">
-             <label className="block text-sm font-medium mb-2">Gallery Images (Add More)</label>
+             <label className="block text-sm font-medium mb-2">Add More Gallery Images</label>
              <input type="file" accept="image/*" multiple onChange={handleGalleryImages} disabled={isUploading} />
              
              <h3 className="text-lg font-medium mt-6 mb-2">Current Images ({galleryImages.length})</h3>
-             <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                  {galleryImages.map((img, idx) => (
-                    <div key={idx} className="relative group">
-                        <Image src={img.imageUrl} alt={img.caption || 'Gallery image'} width={150} height={150} className="h-24 w-full object-cover rounded" />
+                    <div key={img._id || idx} className="relative group">
+                        <Image src={img.imageUrl} alt={img.caption || 'Gallery image'} width={150} height={150} className="h-32 w-full object-cover rounded" />
                         <button
                           type="button"
                           onClick={() => removeImage(idx)}
-                          className="absolute top-0 right-0 m-1 h-6 w-6 rounded-full bg-red-600 text-white text-lg font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute -top-2 -right-2 m-1 h-6 w-6 rounded-full bg-red-600 text-white text-lg font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           &times;
                         </button>
+                        <input
+                          type="text"
+                          placeholder="Add caption..."
+                          value={img.caption || ''}
+                          onChange={(e) => handleImageCaptionChange(idx, e.target.value)}
+                          className="mt-1 w-full border p-1 text-xs rounded"
+                        />
                     </div>
                  ))}
              </div>
