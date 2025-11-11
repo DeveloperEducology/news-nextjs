@@ -1,10 +1,10 @@
 import dbConnect from '../lib/mongodb';
 import Article from '../models/Article';
+import Gallery from '../models/Gallery'; // <-- 1. IMPORT YOUR GALLERY MODEL
 
 const BASE_URL = 'https://www.telugushorts.com';
 
 // Helper function to format date to YYYY-MM-DD
-// --- THIS IS THE FIX ---
 const toISODate = (date) => {
   // If the date is valid, use it.
   if (date) {
@@ -16,9 +16,9 @@ const toISODate = (date) => {
   // If date is null, undefined, or invalid, fallback to today.
   return new Date().toISOString().split('T')[0];
 };
-// --- END OF FIX ---
 
-function generateSitemapXml(articles) {
+// 2. THE GENERATOR NOW ACCEPTS 'articles' AND 'galleries'
+function generateSitemapXml(articles, galleries) {
   let xml = `<?xml version="1.0" encoding="UTF-8"?>`;
   xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
 
@@ -31,19 +31,19 @@ function generateSitemapXml(articles) {
     </url>
   `;
 
-  // 2. Add other static pages
+  // 2. Add the main Gallery List page
   xml += `
     <url>
-      <loc>${BASE_URL}/create-article</loc>
+      <loc>${BASE_URL}/gallery</loc>
       <lastmod>${toISODate(new Date())}</lastmod>
-      <priority>0.5</priority>
+      <priority>0.8</priority>
     </url>
   `;
-
-  // 3. Add all dynamic Article pages
+  
+  // 3. Add all Article pages
   articles.forEach(article => {
-    // This will now safely handle missing dates
-    const lastMod = toISODate(article.updatedAt || article.createdAt);
+    // Use the most recent date
+    const lastMod = toISODate(article.updatedAt || article.publishedDate || article.createdAt);
     
     xml += `
       <url>
@@ -55,21 +55,51 @@ function generateSitemapXml(articles) {
     `;
   });
 
+  // 4. Add all Gallery pages
+  galleries.forEach(gallery => {
+    const lastMod = toISODate(gallery.updatedAt || gallery.publishedDate || gallery.createdAt);
+    
+    xml += `
+      <url>
+        <loc>${BASE_URL}/gallery/${gallery.slug}</loc>
+        <lastmod>${lastMod}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.6</priority>
+      </url>
+    `;
+  });
+
   xml += `</urlset>`;
   return xml;
 }
 
+// 3. UPDATE getServerSideProps TO FETCH BOTH
 export async function getServerSideProps({ res }) {
   try {
     await dbConnect();
+    const now = new Date();
     
-    const articles = await Article.find({})
-      .select('slug updatedAt createdAt')
-      .sort({ createdAt: -1 });
+    // Fetch all published articles
+    const articles = await Article.find({
+      $or: [
+        { status: 'published', publishedDate: { $lte: now } },
+        { status: { $exists: false } }
+      ]
+    }).select('slug updatedAt createdAt publishedDate');
 
-    const sitemap = generateSitemapXml(articles);
+    // Fetch all published galleries
+    const galleries = await Gallery.find({ 
+      status: 'published', 
+      publishedDate: { $lte: now } 
+    }).select('slug updatedAt createdAt publishedDate');
+  
+    // Generate the sitemap XML
+    const sitemap = generateSitemapXml(articles, galleries);
 
+    // Set the response headers
     res.setHeader('Content-Type', 'text/xml');
+    
+    // Send the XML as the response
     res.write(sitemap);
     res.end();
 
@@ -79,8 +109,10 @@ export async function getServerSideProps({ res }) {
     res.end('Internal Server Error');
   }
 
+  // Return an empty props object
   return { props: {} };
 }
 
+// This is just a dummy component
 const Sitemap = () => {};
 export default Sitemap;
