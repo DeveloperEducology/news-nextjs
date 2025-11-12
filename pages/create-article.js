@@ -1,9 +1,9 @@
 import { getSession } from "next-auth/react";
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import SeoHead from '@/components/SeoHead'; // Use @/ alias
-import dbConnect from '@/lib/mongodb';     // Use @/ alias
-import Article from '@/models/Article';       // Use @/ alias
+import SeoHead from '@/components/SeoHead';
+import dbConnect from '@/lib/mongodb';
+import Article from '@/models/Article';
 import MediaLibraryModal from '@/components/admin/MediaLibraryModal';
 import imageCompression from 'browser-image-compression';
 
@@ -54,6 +54,7 @@ export default function CreateArticle({ categories }) {
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [modalTarget, setModalTarget] = useState(null); 
 
+  // --- THIS IS THE UPDATED FUNCTION ---
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'category') {
@@ -66,16 +67,20 @@ export default function CreateArticle({ categories }) {
       }
       return;
     }
+    
     setFormData((prev) => {
-      // --- THIS IS THE FIX ---
-      // Re-enabled auto-slug generation from title
+      // 1. Title no longer generates slug
       if (name === 'title') {
-        return { ...prev, title: value, slug: slugify(value) };
+        return { ...prev, title: value };
       }
-      // --- END OF FIX ---
+      // 2. Slug is now manually entered and gets slugified
+      if (name === 'slug') {
+        return { ...prev, slug: slugify(value) };
+      }
       return { ...prev, [name]: value };
     });
   };
+  // --- END OF UPDATE ---
 
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
@@ -156,7 +161,8 @@ export default function CreateArticle({ categories }) {
       const tagsString = (parsedData.tags && Array.isArray(parsedData.tags)) ? parsedData.tags.join(', ') : '';
       setFormData({
         title: parsedData.title || '',
-        slug: parsedData.slug || slugify(parsedData.title || ''),
+        // This still auto-generates slug from JSON title if JSON slug is missing
+        slug: parsedData.slug || slugify(parsedData.title || ''), 
         author: parsedData.author || '',
         category: parsedData.category || '',
         newCategory: '',
@@ -212,11 +218,8 @@ export default function CreateArticle({ categories }) {
     setIsSubmitting(false);
   };
 
-  // --- STYLING FIX ---
-  // We apply the correct Tailwind classes to all inputs
   const formInputClasses = "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500";
   const formTextareaClasses = `${formInputClasses} font-mono`;
-  // --- END STYLING FIX ---
 
   return (
     <>
@@ -229,7 +232,7 @@ export default function CreateArticle({ categories }) {
           <h2 className="text-xl font-bold mb-4">Quick Add via JSON</h2>
           <textarea
             rows="5"
-            className={formTextareaClasses} // <-- ADDED CLASSES
+            className={formTextareaClasses}
             placeholder='{ "title": "My Title", "content": "...", "summary": "...", ... }'
             value={jsonInput}
             onChange={(e) => setJsonInput(e.target.value)}
@@ -251,10 +254,22 @@ export default function CreateArticle({ categories }) {
               <label htmlFor="title" className="block text-sm font-medium text-gray-700">Title</label>
               <input type="text" name="title" id="title" required className={formInputClasses} value={formData.title} onChange={handleChange} />
             </div>
+            
+            {/* --- THIS IS THE UPDATED SLUG FIELD --- */}
             <div>
-              <label htmlFor="slug" className="block text-sm font-medium text-gray-700">Slug (auto-generated)</label>
-              <input type="text" name="slug" id="slug" readOnly className={`${formInputClasses} bg-gray-100`} value={formData.slug} />
+              <label htmlFor="slug" className="block text-sm font-medium text-gray-700">Slug (must be unique)</label>
+              <input 
+                type="text" 
+                name="slug" 
+                id="slug" 
+                required 
+                className={formInputClasses} // Removed bg-gray-100
+                value={formData.slug} 
+                onChange={handleChange} // Added handler
+              />
             </div>
+            {/* --- END OF UPDATE --- */}
+
             <div>
               <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content (HTML)</label>
               <textarea name="content" id="content" rows="10" required className={formTextareaClasses} value={formData.content} onChange={handleChange} />
@@ -265,6 +280,7 @@ export default function CreateArticle({ categories }) {
             </div>
           </section>
 
+          {/* ... (Rest of the form is unchanged) ... */}
           <section className="space-y-6 pt-6 border-t">
             <h2 className="text-xl font-semibold text-gray-900 border-b pb-2">Media & Metadata</h2>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
