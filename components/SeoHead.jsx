@@ -31,6 +31,12 @@ export default function SeoHead({ title, description, ogImage }) {
       <meta name="twitter:title" content={pageTitle} />
       <meta name="twitter:description" content={pageDescription} />
       <meta name="twitter:image" content={pageOgImage} />
+      <link 
+        rel="alternate" 
+        type="application/rss+xml" 
+        title="TeluguShorts RSS Feed" 
+        href="/rss.xml" 
+      />
       {twitterHandle && <meta name="twitter:site" content={twitterHandle} />}
     </Head>
   );
