@@ -118,26 +118,27 @@ export default function Header() {
       </div>
 
       {/* Desktop Category Nav Bar */}
-      <nav className="hidden border-t border-gray-100 bg-white md:flex">
-        <div className="container mx-auto flex max-w-6xl justify-center gap-8 px-4">
-          {CATEGORIES.map((category) => (
-            <Link
-              key={category.name}
-              href={category.href}
-              className="py-3 text-sm font-semibold text-gray-600 hover:text-blue-600"
-            >
-              {category.name}
-            </Link>
-          ))}
-          <div className="border-l border-gray-200"></div>
-          <Link href="/shorts" className="py-3 text-sm font-semibold text-gray-600 hover:text-blue-600">
-            Shorts
-          </Link>
-          <Link href="/gallery" className="py-3 text-sm font-semibold text-gray-600 hover:text-blue-600">
-            Gallery
-          </Link>
-        </div>
-      </nav>
+     <nav className="hidden border-t border-gray-800 bg-blue-900 md:flex">
+  <div className="container mx-auto flex max-w-6xl justify-center gap-8 px-4">
+    {CATEGORIES.map((category) => (
+      <Link
+        key={category.name}
+        href={category.href}
+        className="py-3 text-sm font-semibold text-white hover:text-blue-300"
+      >
+        {category.name}
+      </Link>
+    ))}
+    <div className="border-l border-blue-800"></div>
+    <Link href="/shorts" className="py-3 text-sm font-semibold text-white hover:text-blue-300">
+      Shorts
+    </Link>
+    <Link href="/gallery" className="py-3 text-sm font-semibold text-white hover:text-blue-300">
+      Gallery
+    </Link>
+  </div>
+</nav>
+
 
       {/* Render the Mobile Menu */}
       <MobileMenu
