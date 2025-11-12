@@ -1,66 +1,89 @@
 import Head from "next/head";
 import Image from "next/image";
+import Script from "next/script"; // ✅ use next/script
 import dbConnect from "../../lib/mongodb";
 import Article from "../../models/Article";
-import { Fragment } from "react";
+import { Fragment, useEffect } from "react";
 import { format } from "date-fns";
 import DOMPurify from "isomorphic-dompurify";
 import SeoHead from "../../components/SeoHead";
-import ShareButtons from "../../components/ShareButtons"; // <-- 1. IMPORT SHARE BUTTONS
+import ShareButtons from "../../components/ShareButtons";
+import he from "he";
 
-// --- Define Your Trusted Domains ---
+
 const OPTIMIZED_DOMAINS = [
-  'cakeimages.s3.ap-northeast-2.amazonaws.com',
-  'via.placeholder.com',
+  "cakeimages.s3.ap-northeast-2.amazonaws.com",
+  "via.placeholder.com",
 ];
 
 export default function ArticlePage({ article }) {
-  if (!article) {
-    return <p>Loading...</p>;
-  }
+  if (!article) return <p>Loading...</p>;
 
-  // --- Check if image is external ---
   let isExternalDomain = true;
   if (article.featuredImage) {
     try {
       const url = new URL(article.featuredImage);
-      if (OPTIMIZED_DOMAINS.includes(url.hostname)) {
-        isExternalDomain = false;
-      }
-    } catch (e) {
+      if (OPTIMIZED_DOMAINS.includes(url.hostname)) isExternalDomain = false;
+    } catch {
       isExternalDomain = true;
     }
   }
 
-  // --- Content Cleaning Logic ---
-  const cleanedContent = (article.content || "")
-    .replace(/(\n|\s|&nbsp;)+<g/g, '<')
-    .replace(/(\n|\s|&nbsp;)+<p/g, '<p')
-    .replace(/(\n|\s|&nbsp;)+<h/g, '<h')
-    .replace(/(\n|\s|&nbsp;)+<s/g, '<s')
-    .replace(/(\n|\s|&nbsp;)+<h/g, '<h')
-    .trim();
+  // --- Decode HTML ---
+  const decoded = he.decode(article.content || "");
+  const cleaned = decoded.replace(/\r?\n|\r/g, "").trim();
 
-  // --- 2. UPDATE DOMPURIFY TO ALLOW EMBEDS ---
-  const sanitizedContent = DOMPurify.sanitize(cleanedContent, {
+  // --- Sanitize safely (keep Telugu + HTML) ---
+  const safeHtml = DOMPurify.sanitize(cleaned, {
     ADD_TAGS: [
-      'h2', 'h3', 'p', 'strong', 'em', 'hr', 'ul', 'ol', 'li', 'br', 'a',
-      'blockquote', // For Twitter/Instagram
-      'script',     // For Twitter/Instagram
-      'iframe'      // For YouTube/Vimeo
+      "h2",
+      "h3",
+      "p",
+      "strong",
+      "em",
+      "hr",
+      "ul",
+      "ol",
+      "li",
+      "br",
+      "a",
+      "blockquote", // ✅ Correct for Twitter/Instagram
+      "iframe", // ✅ Correct for YouTube/Vimeo
+      // ⛔️ 'script' REMOVED FOR SECURITY. IT'S NOT NEEDED.
     ],
     ADD_ATTR: [
-      'href', 'class', 'async', 'src', 'cite', 'data-width', 
-      'data-height', 'style', 'frameborder', 'scrolling'
+      "href",
+      "class",
+      "async",
+      "src",
+      "cite",
+      "data-width",
+      "data-height",
+      "style",
+      "frameborder",
+      "scrolling",
+      "allow",
+      "allowfullscreen",
     ],
   });
-  // --- End of Update ---
 
+  // --- Reload embeds after render ---
+  useEffect(() => {
+    // This re-loads embeds on client-side navigation
+    if (window.twttr && window.twttr.widgets) {
+      window.twttr.widgets.load();
+    }
+    if (window.instgrm && window.instgrm.Embeds) {
+      window.instgrm.Embeds.process();
+    }
+  }, [article.slug]); // Re-run when the article changes
+
+  // --- SEO Schema ---
   const schemaData = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     headline: article.title,
-    description: article.summary, 
+    description: article.summary,
     datePublished: article.createdAt,
     dateModified: article.updatedAt,
     author: {
@@ -83,10 +106,26 @@ export default function ArticlePage({ article }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaData) }}
         />
-        {/* Instagram/Twitter embed script. This is needed ONCE per page. */}
-        <script async src="//www.instagram.com/embed.js"></script>
-        <script async src="https://platform.twitter.com/widgets.js" charSet="utf-8"></script>
+
+        {/* ✅ ADDED: Load the Noto Sans Telugu font */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@400;700&display=swap"
+          rel="stylesheet"
+        />
       </Head>
+
+      {/* ✅ Load embed scripts properly */}
+      <Script
+        src="https://platform.twitter.com/widgets.js"
+        strategy="lazyOnload"
+      />
+      <Script src="//www.instagram.com/embed.js" strategy="lazyOnload" />
 
       <div className="container mx-auto max-w-3xl px-4 py-8">
         <article className="rounded-lg bg-white p-6 shadow-lg md:p-10">
@@ -99,11 +138,9 @@ export default function ArticlePage({ article }) {
             {format(new Date(article.createdAt), "MMMM d, yyyy")}
           </p>
 
-          {/* --- 3. ADD SHARE BUTTONS --- */}
           <div className="mb-6">
             <ShareButtons title={article.title} slug={article.slug} />
           </div>
-          {/* --- END SHARE BUTTONS --- */}
 
           {article.featuredImage && (
             <Image
@@ -113,14 +150,14 @@ export default function ArticlePage({ article }) {
               height={600}
               className="mb-6 w-full rounded-lg object-cover"
               priority
-              unoptimized={isExternalDomain} 
+              unoptimized={isExternalDomain}
             />
           )}
 
-          {/* This will now render your HTML content AND embeds */}
+          {/* Telugu + HTML rendering */}
           <div
-            className="prose prose-lg max-w-none prose-img:rounded-lg"
-            dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+            className="prose prose-lg max-w-none prose-img:rounded-lg font-[Noto_Sans_Telugu]"
+            dangerouslySetInnerHTML={{ __html: decoded }}
           />
 
           {article.tags && article.tags.length > 0 && (
@@ -132,7 +169,7 @@ export default function ArticlePage({ article }) {
                     key={tag}
                     className="cursor-pointer rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 hover:bg-blue-200"
                   >
-                    {tag}
+                    <h2>{tag}</h2>
                   </a>
                 ))}
               </div>
@@ -144,60 +181,45 @@ export default function ArticlePage({ article }) {
   );
 }
 
-// --- Data Fetching (No Change) ---
+// --- Static Paths (No Change) ---
 export async function getStaticPaths() {
   await dbConnect();
   const now = new Date();
-  const articles = await Article.find({
-    $or: [
-      { status: 'published', publishedDate: { $lte: now } },
-      { status: { $exists: false } }
-    ]
-  }, "slug");
-  
-  const paths = articles.map((article) => ({
-    params: { slug: article.slug },
-  }));
-  
+  const articles = await Article.find(
+    {
+      $or: [
+        { status: "published", publishedDate: { $lte: now } },
+        { status: { $exists: false } },
+      ],
+    },
+    "slug"
+  );
+
+  const paths = articles.map((a) => ({ params: { slug: a.slug } }));
   return { paths, fallback: "blocking" };
 }
 
+// --- Static Props (No Change) ---
 export async function getStaticProps({ params }) {
   await dbConnect();
   const { slug } = params;
-
   const now = new Date();
-  const result = await Article.findOne({ 
-    slug: slug,
+
+  const result = await Article.findOne({
+    slug,
     $or: [
-      { status: 'published', publishedDate: { $lte: now } },
-      { status: { $exists: false } }
-    ]
+      { status: "published", publishedDate: { $lte: now } },
+      { status: { $exists: false } },
+    ],
   });
 
-  if (!result) {
-    return { notFound: true };
-  }
+  if (!result) return { notFound: true };
 
   const article = result.toObject();
   article._id = article._id.toString();
-  
-  if (article.publishedDate) {
-    article.createdAt = article.publishedDate.toString();
-  } else if (article.createdAt) {
-    article.createdAt = article.createdAt.toString();
-  }
-  
-  if (article.updatedAt) {
-    article.updatedAt = article.updatedAt.toString();
-  }
-  
+  article.createdAt = (article.publishedDate || article.createdAt)?.toString();
+  article.updatedAt = article.updatedAt?.toString();
   delete article.publishedDate;
 
-  return {
-    props: {
-      article: article,
-    },
-    revalidate: 60,
-  };
+  return { props: { article }, revalidate: 60 };
 }

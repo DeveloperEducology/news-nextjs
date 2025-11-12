@@ -1,7 +1,7 @@
 import { useSession, signIn, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { X } from 'lucide-react'; // Import the 'X' icon
+import { X } from 'lucide-react';
 
 // We pass the categories as a prop from the Header
 export default function MobileMenu({ isOpen, setIsOpen, categories }) {
@@ -12,18 +12,14 @@ export default function MobileMenu({ isOpen, setIsOpen, categories }) {
 
   return (
     <>
-      {/* This is the semi-transparent background overlay.
-        It's visible when 'isOpen' is true.
-      */}
+      {/* Background overlay */}
       <div
         onClick={closeMenu}
         className={`fixed inset-0 z-40 bg-black/50 transition-opacity
           ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       />
 
-      {/* This is the menu panel itself.
-        It slides in from the left.
-      */}
+      {/* Menu panel */}
       <div
         className={`fixed top-0 left-0 z-50 h-full w-72 transform bg-white
           shadow-xl transition-transform duration-300
@@ -31,9 +27,12 @@ export default function MobileMenu({ isOpen, setIsOpen, categories }) {
       >
         {/* Menu Content */}
         <div className="flex h-full flex-col">
-          {/* Header */}
+          
+          {/* Header with Logo and Close button */}
           <div className="flex items-center justify-between border-b p-4">
-            <h2 className="text-lg font-semibold">Menu</h2>
+            <Link href="/" onClick={closeMenu} className="text-xl font-extrabold text-gray-900">
+              తెలుగు Shorts
+            </Link>
             <button
               onClick={closeMenu}
               className="rounded-full p-1 hover:bg-gray-100"
@@ -44,6 +43,7 @@ export default function MobileMenu({ isOpen, setIsOpen, categories }) {
 
           {/* Scrollable Navigation */}
           <nav className="flex-grow overflow-y-auto p-4">
+            
             {/* Auth Section */}
             <div className="mb-4 border-b pb-4">
               {session ? (
@@ -64,7 +64,7 @@ export default function MobileMenu({ isOpen, setIsOpen, categories }) {
                         signOut();
                         closeMenu();
                       }}
-                      className="text-sm text-red-600"
+                      className="text-sm font-medium text-red-600 hover:text-red-800"
                     >
                       Sign Out
                     </button>
