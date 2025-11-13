@@ -5,13 +5,12 @@ import SeoHead from "@/components/SeoHead";
 import dbConnect from "@/lib/mongodb";
 import Article from "@/models/Article";
 import imageCompression from "browser-image-compression";
-import dynamic from 'next/dynamic'; // <-- 1. IMPORT DYNAMIC
-import MediaLibraryModal from "@/components/admin/MediaLibraryModal";
+import dynamic from 'next/dynamic';
+import MediaLibraryModal from '@/components/admin/MediaLibraryModal'; // <-- 1. IMPORT MODAL
 
-
-// --- 2. DYNAMICALLY IMPORT THE EDITOR ---
+// --- DYNAMICALLY IMPORT THE EDITOR ---
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
-// --- END ---
+// (Make sure 'react-quill-new/dist/quill.snow.css' is in your _app.js)
 
 // Helper: Formats a Date object into 'YYYY-MM-DDTHH:MM'
 const formatDateForInput = (date) => {
@@ -25,6 +24,7 @@ const formatDateForInput = (date) => {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
+// Helper: Creates a URL-friendly slug
 const slugify = (str) =>
   str
     .toLowerCase()
@@ -33,7 +33,7 @@ const slugify = (str) =>
     .replace(/[\s_-]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-// --- 3. CONFIGURE THE EDITOR'S TOOLBAR ---
+// --- CONFIGURE THE EDITOR'S TOOLBAR ---
 const quillModules = {
   toolbar: [
     [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
@@ -52,13 +52,12 @@ const quillModules = {
     matchVisual: false,
   },
 };
-// --- END ---
 
 export default function EditArticlePage({ article, categories }) {
   const router = useRouter();
   const { slug: currentSlug } = router.query;
 
-  // Initialize state with existing article data
+  // --- 2. UPDATE STATE to include all new fields ---
   const [formData, setFormData] = useState({
     title: article.title || "",
     slug: article.slug || "",
@@ -68,8 +67,10 @@ export default function EditArticlePage({ article, categories }) {
     summary: article.summary || "",
     featuredImage: article.featuredImage || "",
     featuredVideo: article.featuredVideo || "",
-    content: article.content || "", // This will be passed to ReactQuill
-    tags: article?.tags || "",
+    content: article.content || "",
+    liveContent: article.liveContent || '', // <-- ADDED
+    isFullArticle: article.isFullArticle || false, // <-- ADDED
+    tags: article.tags || "", // 'tags' is already a string from getServerSideProps
     publishedDate: formatDateForInput(article.publishedDate || new Date()),
     status: article.status || "published",
   });
@@ -79,10 +80,17 @@ export default function EditArticlePage({ article, categories }) {
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
-  const [modalTarget, setModalTarget] = useState(null); // Added modal state
+  const [modalTarget, setModalTarget] = useState(null); // <-- ADDED
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    
+    // Handle checkbox
+    if (type === "checkbox") {
+      setFormData(prev => ({ ...prev, [name]: checked }));
+      return;
+    }
+    
     if (name === "category") {
       if (value === "__NEW__") {
         setShowNewCategory(true);
@@ -101,16 +109,15 @@ export default function EditArticlePage({ article, categories }) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
   
-  // --- 4. ADD A NEW HANDLER FOR THE EDITOR ---
+  // Handler for the Rich Text Editor
   const handleContentChange = (value) => {
     setFormData((prev) => ({
       ...prev,
       content: value,
     }));
   };
-  // --- END ---
-
-  // ... (All other handlers: handleImageChange, handleVideoChange, etc. are correct) ...
+  
+  // ... (All other handlers: handleImageChange, handleVideoChange are correct) ...
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -170,6 +177,8 @@ export default function EditArticlePage({ article, categories }) {
     }
     setIsUploadingVideo(false);
   };
+
+  // 3. ADD MEDIA LIBRARY HANDLER
   const handleMediaSelect = (imageUrl) => {
     if (modalTarget === 'image') {
       setFormData(prev => ({ ...prev, featuredImage: imageUrl }));
@@ -179,6 +188,7 @@ export default function EditArticlePage({ article, categories }) {
     }
     setModalTarget(null);
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -219,7 +229,6 @@ export default function EditArticlePage({ article, categories }) {
     setIsSubmitting(false);
   };
   
-  // --- 5. ADD STYLING CLASSES ---
   const formInputClasses = "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500";
   const formTextareaClasses = `${formInputClasses} font-mono`;
 
@@ -246,10 +255,43 @@ export default function EditArticlePage({ article, categories }) {
               <input type="text" name="slug" id="slug" required className={formInputClasses} value={formData.slug} onChange={handleChange} />
               <p className="text-xs text-red-500 mt-1">Warning: Changing the slug will break existing links to this article.</p>
             </div>
+
+            {/* --- 4. ADD 'isFullArticle' CHECKBOX --- */}
+            <div className="rounded-md bg-blue-50 p-4">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  name="isFullArticle"
+                  className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500"
+                  checked={formData.isFullArticle}
+                  onChange={handleChange}
+                />
+                <span className="font-medium text-blue-800">
+                  Publish as Full Article (Show on Homepage Grid)
+                </span>
+              </label>
+            </div>
             
-            {/* --- 6. REPLACE TEXTAREA WITH EDITOR --- */}
+            {/* --- 5. ADD 'liveContent' FIELD --- */}
             <div>
-              <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content</label>
+              <label htmlFor="liveContent" className="block text-sm font-medium text-gray-700">
+                Live Update Content
+              </label>
+              <p className="text-xs text-gray-500">
+                Shows on the "Live Feed" page. Use this for short updates.
+              </p>
+              <textarea 
+                name="liveContent" 
+                id="liveContent" 
+                rows="4" 
+                className={formTextareaClasses} 
+                value={formData.liveContent} 
+                onChange={handleChange} 
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="content" className="block text-sm font-medium text-gray-700">Full Article Content</label>
               <div className="mt-1 bg-white">
                 <ReactQuill
                   theme="snow"
@@ -260,15 +302,14 @@ export default function EditArticlePage({ article, categories }) {
                 />
               </div>
             </div>
-            {/* --- END OF REPLACEMENT --- */}
-
+            
             <div>
               <label htmlFor="summary" className="block text-sm font-medium text-gray-700">Summary (Excerpt)</label>
               <textarea name="summary" id="summary" rows="3" required className={formInputClasses} value={formData.summary} onChange={handleChange} />
             </div>
           </section>
 
-          {/* ... (Rest of the form is unchanged) ... */}
+          {/* --- 6. UPDATE MEDIA SECTION --- */}
           <section className="space-y-6 pt-6 border-t">
             <h2 className="text-xl font-semibold text-gray-900 border-b pb-2">Media & Metadata</h2>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -328,6 +369,7 @@ export default function EditArticlePage({ article, categories }) {
             </div>
           </section>
 
+          {/* ... (Publishing section is unchanged) ... */}
           <section className="space-y-6 pt-6 border-t">
             <h2 className="text-xl font-semibold text-gray-900 border-b pb-2">Publishing</h2>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -359,7 +401,7 @@ export default function EditArticlePage({ article, categories }) {
         </form>
       </div>
       
-      {/* Add the Modal component */}
+      {/* 7. ADD THE MODAL COMPONENT */}
       <MediaLibraryModal
         isOpen={!!modalTarget}
         onClose={() => setModalTarget(null)}
@@ -369,7 +411,7 @@ export default function EditArticlePage({ article, categories }) {
   );
 }
 
-// Server-side: Fetch article AND categories
+// --- 8. UPDATE getServerSideProps ---
 export async function getServerSideProps(context) {
   const session = await getSession(context);
   if (!session || session.user.role !== "admin") {
@@ -379,25 +421,27 @@ export async function getServerSideProps(context) {
   const { slug } = context.params;
   await dbConnect();
 
-  // 1. Fetch Article
   const result = await Article.findOne({ slug: slug });
   if (!result) return { notFound: true };
 
-  // 2. Fetch Categories
   const categoriesList = await Article.distinct("category");
   const sortedCategories = categoriesList.filter(c => c).sort();
 
-  // 3. Serialize Article
   const article = result.toObject();
   article._id = article._id.toString();
   if (article.createdAt) article.createdAt = article.createdAt.toString();
   if (article.updatedAt) article.updatedAt = article.updatedAt.toString();
   if (article.publishedDate) article.publishedDate = article.publishedDate.toString();
   
-  // Make sure 'tags' is a string
   if (Array.isArray(article.tags)) {
       article.tags = article.tags.join(', ');
+  } else {
+      article.tags = ""; // Ensure it's a string
   }
+  
+  // Ensure new fields exist
+  article.liveContent = article.liveContent || "";
+  article.isFullArticle = article.isFullArticle || false;
 
   return {
     props: {

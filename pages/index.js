@@ -148,19 +148,28 @@ function serializeData(data) {
   });
 }
 
+// ... (Your 'Home' component and 'serializeData' function are fine) ...
+
 export async function getStaticProps() {
   await dbConnect();
   
   const now = new Date();
-  const limit = 10; // This is page 1
-  const headlineLimit = 15; // How many headlines for the sidebar
+  const limit = 10;
+  const headlineLimit = 15;
 
+  // --- THIS IS THE CORRECTED QUERY ---
   const query = {
-    $or: [
-      { status: 'published', publishedDate: { $lte: now } },
-      { status: { $exists: false } }
-    ]
+    // 1. The article MUST be a "full article"
+    isFullArticle: true,
+    // 2. AND it must be published
+    status: 'published',
+    // 3. AND its publish date must be in the past
+    publishedDate: { $lte: now },
+    
+    // We no longer need the $or operator because the
+    // 'isFullArticle' check correctly separates your content.
   };
+  // --- END OF CORRECTION ---
 
   // 1. Get the first 10 articles for the main list
   const result = await Article.find(query)
@@ -174,16 +183,16 @@ export async function getStaticProps() {
   const headlineResult = await Article.find(query)
     .sort({ publishedDate: -1, createdAt: -1 })
     .limit(headlineLimit)
-    .select('title slug'); // Only fetch what you need
+    .select('title slug');
 
   const initialArticles = serializeData(result);
-  const headlines = serializeData(headlineResult); // Use the same serializer
+  const headlines = serializeData(headlineResult);
 
   return {
     props: {
       initialArticles,
       totalPosts,
-      headlines, // Pass real headlines to the page
+      headlines,
     },
     revalidate: 60,
   };

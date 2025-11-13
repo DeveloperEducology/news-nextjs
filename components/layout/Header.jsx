@@ -115,6 +115,7 @@ export default function Header() {
             </button>
           )}
         </nav>
+       
       </div>
 
       {/* Desktop Category Nav Bar */}
@@ -130,6 +131,9 @@ export default function Header() {
       </Link>
     ))}
     <div className="border-l border-blue-800"></div>
+     <Link href="/live" className="py-3 text-sm font-semibold text-red-600 hover:text-red-700">
+            Live
+          </Link>
     <Link href="/shorts" className="py-3 text-sm font-semibold text-white hover:text-blue-300">
       Shorts
     </Link>

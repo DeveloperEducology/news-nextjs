@@ -71,6 +71,8 @@ export default function CreateArticle({ categories }) {
     summary: '',
     featuredImage: '',
     featuredVideo: '',
+    liveContent: '', // <-- ADD THIS
+  isFullArticle: false, // <-- ADD THIS
     content: '',
     tags: '',
     publishedDate: formatDateForInput(new Date()),
@@ -292,6 +294,41 @@ export default function CreateArticle({ categories }) {
               <label htmlFor="slug" className="block text-sm font-medium text-gray-700">Slug (must be unique)</label>
               <input type="text" name="slug" id="slug" required className={formInputClasses} value={formData.slug} onChange={handleChange} />
             </div>
+            <div className="rounded-md bg-blue-50 p-4">
+      <label className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          name="isFullArticle"
+          className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500"
+          checked={formData.isFullArticle}
+          onChange={(e) => setFormData(prev => ({ ...prev, isFullArticle: e.target.checked }))}
+        />
+        <span className="font-medium text-blue-800">
+          Publish as Full Article (Show on Homepage Grid)
+        </span>
+      </label>
+      <p className="text-sm text-blue-700 mt-2">
+        Leave this unchecked to post as a "Live Update" only. Check it when the full article is ready to be featured.
+      </p>
+    </div>
+
+    {/* --- NEW 'liveContent' Field --- */}
+    <div>
+      <label htmlFor="liveContent" className="block text-sm font-medium text-gray-700">
+        Live Update Content
+      </label>
+      <p className="text-xs text-gray-500">
+        A short, quick update. This will show on the Live Feed page. You can use basic HTML.
+      </p>
+      <textarea 
+        name="liveContent" 
+        id="liveContent" 
+        rows="4" 
+        className={formTextareaClasses} 
+        value={formData.liveContent} 
+        onChange={handleChange} 
+      />
+    </div>
 
             {/* --- RICH TEXT EDITOR --- */}
             <div>

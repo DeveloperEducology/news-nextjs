@@ -19,7 +19,15 @@ const ArticleSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: [true, 'Please provide content.'],
+      required: [false, 'Please provide content.'],
+    },
+    liveContent: {
+      type: String, // For simple "live point" text/HTML
+      trim: true,
+    },
+    isFullArticle: {
+      type: Boolean,
+      default: false, // Will not show on homepage grid by default
     },
     author: {
       type: String,
