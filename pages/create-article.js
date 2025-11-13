@@ -6,8 +6,13 @@ import dbConnect from '@/lib/mongodb';
 import Article from '@/models/Article';
 import MediaLibraryModal from '@/components/admin/MediaLibraryModal';
 import imageCompression from 'browser-image-compression';
+import dynamic from 'next/dynamic';
 
-// Helper: Formats a Date object into 'YYYY-MM-DDTHH:MM' for the input
+// 1. USE THE NEWER 'react-quill-new'
+const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
+import 'react-quill-new/dist/quill.snow.css'; // Make sure this is in _app.js or here
+
+// Helper: Formats a Date object into 'YYYY-MM-DDTHH:MM'
 const formatDateForInput = (date) => {
   if (!date) return '';
   const d = new Date(date);
@@ -28,6 +33,32 @@ const slugify = (str) =>
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+// --- 2. THIS IS THE NEW "FULL" TOOLBAR ---
+const quillModules = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+    [{ 'font': [] }],
+    [{ 'size': ['small', false, 'large', 'huge'] }],
+
+    ['bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block'],
+
+    [{ 'color': [] }, { 'background': [] }],
+    [{ 'script': 'sub'}, { 'script': 'super' }],
+
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    [{ 'indent': '-1'}, { 'indent': '+1' }],
+    [{ 'direction': 'rtl' }, { 'align': [] }],
+
+    ['link', 'image', 'video'],
+
+    ['clean']
+  ],
+  clipboard: {
+    matchVisual: false, // Helps paste clean text
+  },
+};
+// --- END OF NEW TOOLBAR ---
+
 export default function CreateArticle({ categories }) {
   const router = useRouter();
   
@@ -46,6 +77,7 @@ export default function CreateArticle({ categories }) {
     status: 'published',
   });
   
+  // ... (All your other state variables are correct) ...
   const [jsonInput, setJsonInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -54,7 +86,7 @@ export default function CreateArticle({ categories }) {
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [modalTarget, setModalTarget] = useState(null); 
 
-  // --- THIS IS THE UPDATED FUNCTION ---
+  // This is your manual slug + slugify handler
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'category') {
@@ -67,21 +99,26 @@ export default function CreateArticle({ categories }) {
       }
       return;
     }
-    
     setFormData((prev) => {
-      // 1. Title no longer generates slug
       if (name === 'title') {
         return { ...prev, title: value };
       }
-      // 2. Slug is now manually entered and gets slugified
       if (name === 'slug') {
         return { ...prev, slug: slugify(value) };
       }
       return { ...prev, [name]: value };
     });
   };
-  // --- END OF UPDATE ---
 
+  // Handler for the Rich Text Editor
+  const handleContentChange = (value) => {
+    setFormData((prev) => ({
+      ...prev,
+      content: value,
+    }));
+  };
+
+  // ... (All other handlers: handleImageChange, handleVideoChange, etc. are correct) ...
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -116,7 +153,6 @@ export default function CreateArticle({ categories }) {
     }
     setIsUploadingImage(false);
   };
-
   const handleVideoChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -142,7 +178,6 @@ export default function CreateArticle({ categories }) {
     }
     setIsUploadingVideo(false);
   };
-
   const handleMediaSelect = (imageUrl) => {
     if (modalTarget === 'image') {
       setFormData(prev => ({ ...prev, featuredImage: imageUrl }));
@@ -150,9 +185,8 @@ export default function CreateArticle({ categories }) {
     if (modalTarget === 'video') {
       setFormData(prev => ({ ...prev, featuredVideo: imageUrl }));
     }
-    setModalTarget(null); // Close the modal
+    setModalTarget(null);
   };
-
   const handleParseJson = () => {
     setError('');
     if (!jsonInput) return;
@@ -161,7 +195,6 @@ export default function CreateArticle({ categories }) {
       const tagsString = (parsedData.tags && Array.isArray(parsedData.tags)) ? parsedData.tags.join(', ') : '';
       setFormData({
         title: parsedData.title || '',
-        // This still auto-generates slug from JSON title if JSON slug is missing
         slug: parsedData.slug || slugify(parsedData.title || ''), 
         author: parsedData.author || '',
         category: parsedData.category || '',
@@ -180,7 +213,6 @@ export default function CreateArticle({ categories }) {
       setError(`Invalid JSON: ${err.message}`);
     }
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -217,6 +249,7 @@ export default function CreateArticle({ categories }) {
     }
     setIsSubmitting(false);
   };
+  // ---
 
   const formInputClasses = "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500";
   const formTextareaClasses = `${formInputClasses} font-mono`;
@@ -227,7 +260,7 @@ export default function CreateArticle({ categories }) {
       <div className="container mx-auto max-w-3xl px-4 py-8">
         <h1 className="mb-6 text-3xl font-bold">Create a New Article</h1>
 
-        {/* --- JSON PARSER SECTION --- */}
+        {/* --- JSON PARSER --- */}
         <div className="mb-8 rounded-lg bg-white p-8 shadow-lg">
           <h2 className="text-xl font-bold mb-4">Quick Add via JSON</h2>
           <textarea
@@ -255,25 +288,26 @@ export default function CreateArticle({ categories }) {
               <input type="text" name="title" id="title" required className={formInputClasses} value={formData.title} onChange={handleChange} />
             </div>
             
-            {/* --- THIS IS THE UPDATED SLUG FIELD --- */}
             <div>
               <label htmlFor="slug" className="block text-sm font-medium text-gray-700">Slug (must be unique)</label>
-              <input 
-                type="text" 
-                name="slug" 
-                id="slug" 
-                required 
-                className={formInputClasses} // Removed bg-gray-100
-                value={formData.slug} 
-                onChange={handleChange} // Added handler
-              />
+              <input type="text" name="slug" id="slug" required className={formInputClasses} value={formData.slug} onChange={handleChange} />
             </div>
-            {/* --- END OF UPDATE --- */}
 
+            {/* --- RICH TEXT EDITOR --- */}
             <div>
-              <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content (HTML)</label>
-              <textarea name="content" id="content" rows="10" required className={formTextareaClasses} value={formData.content} onChange={handleChange} />
+              <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content</label>
+              <div className="mt-1 bg-white">
+                <ReactQuill
+                  theme="snow"
+                  value={formData.content}
+                  onChange={handleContentChange}
+                  modules={quillModules} // Use the new "full" toolbar
+                  className="[&_.ql-editor]:min-h-[300px]"
+                />
+              </div>
             </div>
+            {/* --- END OF EDITOR --- */}
+            
             <div>
               <label htmlFor="summary" className="block text-sm font-medium text-gray-700">Summary (Excerpt)</label>
               <textarea name="summary" id="summary" rows="3" required className={formInputClasses} value={formData.summary} onChange={handleChange} />
@@ -284,6 +318,7 @@ export default function CreateArticle({ categories }) {
           <section className="space-y-6 pt-6 border-t">
             <h2 className="text-xl font-semibold text-gray-900 border-b pb-2">Media & Metadata</h2>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {/* Featured Image */}
               <div>
                 <label htmlFor="featuredImage" className="block text-sm font-medium text-gray-700">Featured Image</label>
                 <div className="mt-1 flex gap-2">
@@ -295,20 +330,14 @@ export default function CreateArticle({ categories }) {
                     className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
                     onChange={handleImageChange}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setModalTarget('image')}
-                    className="flex-shrink-0 rounded-md bg-gray-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700"
-                  >
-                    Select
-                  </button>
+                  <button type="button" onClick={() => setModalTarget('image')} className="flex-shrink-0 rounded-md bg-gray-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700">Select</button>
                 </div>
                 {isUploadingImage && <p className="mt-2 text-sm text-gray-500">Uploading Image...</p>}
                 {formData.featuredImage && (
                   <input type="text" readOnly value={formData.featuredImage} className={`${formInputClasses} mt-2 bg-gray-100 text-sm`} />
                 )}
               </div>
-
+              {/* Featured Video */}
               <div>
                 <label htmlFor="featuredVideo" className="block text-sm font-medium text-gray-700">Featured Video</label>
                 <div className="mt-1 flex gap-2">
@@ -320,13 +349,7 @@ export default function CreateArticle({ categories }) {
                     className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-green-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-green-700 hover:file:bg-green-100"
                     onChange={handleVideoChange}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setModalTarget('video')}
-                    className="flex-shrink-0 rounded-md bg-gray-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700"
-                  >
-                    Select
-                  </button>
+                  <button type="button" onClick={() => setModalTarget('video')} className="flex-shrink-0 rounded-md bg-gray-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700">Select</button>
                 </div>
                 {isUploadingVideo && <p className="mt-2 text-sm text-gray-500">Uploading Video...</p>}
                 {formData.featuredVideo && (

@@ -1,4 +1,5 @@
 import '../styles/globals.css';
+import 'react-quill-new/dist/quill.snow.css'; // <-- 1. UPDATE THIS LINE
 import Layout from '../components/layout/Layout';
 import { SessionProvider } from "next-auth/react";
 import { useRouter } from 'next/router';
