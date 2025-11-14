@@ -218,6 +218,18 @@ export default function EditArticlePage({ article, categories }) {
       });
       if (res.ok) {
         alert("Article updated successfully!");
+        // --- THIS IS THE NEW PART ---
+        // Tell Google to index this new URL
+        // We don't 'await' this; just send it.
+        fetch('/api/request-indexing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            urlPath: `/article/${dataToSend.slug}`,
+            type: 'URL_UPDATED'
+          })
+        });
+        // --- END OF NEW PART ---
         router.push("/admin");
       } else {
         const data = await res.json();

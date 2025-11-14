@@ -39,6 +39,18 @@ function generateSitemapXml(articles, galleries) {
       <priority>0.8</priority>
     </url>
   `;
+
+  // --- THIS IS THE NEW PART ---
+  // 3. Add the Live Updates page
+  xml += `
+    <url>
+      <loc>${BASE_URL}/live</loc>
+      <lastmod>${toISODate(new Date())}</lastmod>
+      <changefreq>hourly</changefreq>
+      <priority>0.9</priority>
+    </url>
+  `;
+  // --- END OF NEW PART ---
   
   // 3. Add all Article pages
   articles.forEach(article => {

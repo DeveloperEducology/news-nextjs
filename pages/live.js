@@ -1,18 +1,17 @@
 import SeoHead from '@/components/SeoHead';
 import dbConnect from '@/lib/mongodb';
-import Article from '@/models/Article';
+import Article from '@/models/Article'; // Use the Article model
 import { format } from 'date-fns';
 import he from 'he';
 import DOMPurify from 'isomorphic-dompurify';
 import Header from '@/components/layout/Header';
-import { Fragment, useEffect } from 'react'; // <-- 1. Import Fragment and useEffect
-import Script from 'next/script'; // <-- 2. Import Script
+import { Fragment, useEffect } from 'react';
+import Script from 'next/script';
+import Head from 'next/head'; // <-- 1. IMPORT Head
 
 // Helper component for a single live post
 function LiveUpdatePost({ update }) {
-  
-  // --- 3. THIS IS THE FIX ---
-  // Upgrade the sanitizer to allow all rich text editor tags
+  // Sanitize the 'liveContent' field
   const decodedContent = he.decode(update.liveContent || "");
   const sanitizedContent = DOMPurify.sanitize(decodedContent, {
     ADD_TAGS: [
@@ -26,10 +25,8 @@ function LiveUpdatePost({ update }) {
       'data-width', 'data-height', 'async'
     ],
   });
-  // --- END OF FIX ---
 
-  // --- 4. Add useEffect to load embeds ---
-  // This tells Twitter/Instagram to scan this post for embeds
+  // Reload embeds (like Twitter)
   useEffect(() => {
     if (window.twttr && window.twttr.widgets) {
       window.twttr.widgets.load();
@@ -37,8 +34,7 @@ function LiveUpdatePost({ update }) {
     if (window.instgrm && window.instgrm.Embeds) {
       window.instgrm.Embeds.process();
     }
-  }, [update._id]); // Re-run every time a new post renders
-  // --- END ---
+  }, [update._id]); // Re-run when the post renders
 
   return (
     <article className="rounded-lg bg-white p-5 shadow-lg relative">
@@ -51,7 +47,7 @@ function LiveUpdatePost({ update }) {
         {format(new Date(update.publishedDate), "MMMM d, yyyy 'at' hh:mm a")}
       </p>
       
-      {/* This will now correctly render embeds */}
+      {/* Render the 'liveContent' from the Article model */}
       <div 
         className="prose max-w-none prose-p:my-2 prose-img:rounded-lg"
         dangerouslySetInnerHTML={{ __html: sanitizedContent }} 
@@ -64,23 +60,77 @@ function LiveUpdatePost({ update }) {
   );
 }
 
-// This is the main page component
+// THIS IS THE UPDATED PAGE COMPONENT
 export default function LiveFeedPage({ updates }) {
+  
+  // --- 2. CREATE THE SCHEMA ---
+  const getCoverageTimes = () => {
+    if (!updates || updates.length === 0) {
+      const now = new Date().toISOString();
+      return { startTime: now, endTime: now };
+    }
+    // Newest post (top of the page)
+    const endTime = new Date(updates[0].publishedDate).toISOString();
+    // Oldest post (bottom of the page)
+    const startTime = new Date(updates[updates.length - 1].publishedDate).toISOString();
+    return { startTime, endTime };
+  };
+
+  const { startTime, endTime } = getCoverageTimes();
+
+  const schemaData = {
+    "@context": "https://schema.org",
+    "@type": "LiveBlogPosting",
+    "headline": "Live Updates - TeluguShorts",
+    "description": "The latest breaking news and live updates from TeluguShorts.",
+    "coverageStartTime": startTime,
+    "coverageEndTime": endTime,
+    "publisher": {
+      "@type": "Organization",
+      "name": "TeluguShorts",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.telugushorts.com/logo.png" // <-- IMPORTANT: Add a real logo URL here
+      }
+    },
+    // This loops through your live posts and creates an "update" for each one
+    "liveBlogUpdate": updates.map(update => {
+      return {
+        "@type": "BlogPosting",
+        // Use a snippet of content as the headline
+        "headline": (update.liveContent || "Live Update").substring(0, 110).replace(/<[^>]+>/g, '') + "...",
+        "datePublished": new Date(update.publishedDate).toISOString(),
+        "dateModified": new Date(update.updatedAt).toISOString(),
+        "author": {
+          "@type": "Person",
+          "name": update.author
+        },
+        "articleBody": update.liveContent
+      }
+    })
+  };
+  // --- END OF SCHEMA ---
+
   return (
-    <Fragment> {/* <-- 5. Use Fragment */}
+    <Fragment> 
       <SeoHead 
         title="Live Updates" 
         description="The latest breaking news and live updates."
       />
-
-      {/* --- 6. ADD EMBED SCRIPTS --- */}
-      <Script
-        src="https://platform.twitter.com/widgets.js"
-        strategy="lazyOnload"
-      />
+      
+      {/* --- 3. ADD THE SCHEMA TO YOUR <Head> --- */}
+      <Head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaData) }}
+        />
+      </Head>
+      
+      {/* --- Embed Scripts --- */}
+      <Script src="https://platform.twitter.com/widgets.js" strategy="lazyOnload" />
       <Script src="//www.instagram.com/embed.js" strategy="lazyOnload" />
-      {/* --- END --- */}
-
+      
+      <Header />
       
       <main className="container mx-auto max-w-3xl px-4 py-8">
         <div>
@@ -103,19 +153,21 @@ export default function LiveFeedPage({ updates }) {
   );
 }
 
-// ... (getServerSideProps function is unchanged and correct) ...
+// Use SSR (getServerSideProps) for a real-time feed
 export async function getServerSideProps(context) {
   await dbConnect();
   const now = new Date();
   
+  // It fetches from the 'Article' collection
   const result = await Article.find({
     isFullArticle: false, // Only show "live points"
     status: 'published',
     publishedDate: { $lte: now }
   })
     .sort({ publishedDate: -1 }) // Sort by the publish date
-    .limit(20);
+    .limit(20); // Get the 20 most recent live updates
 
+  // Serialize the data
   const updates = result.map((doc) => {
     const update = doc.toObject();
     update._id = update._id.toString();
@@ -129,5 +181,6 @@ export async function getServerSideProps(context) {
     props: {
       updates: updates,
     },
+    // No 'revalidate' - this page is fetched live every time
   };
 }

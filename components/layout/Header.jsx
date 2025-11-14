@@ -6,13 +6,9 @@ import { Menu } from 'lucide-react';
 import MobileMenu from './MobileMenu';
 import { useRouter } from 'next/router';
 
-// Define your categories here
 const CATEGORIES = [
   { name: 'Sports', href: '/category/sports' },
   { name: 'Tech', href: '/category/tech' },
-  { name: 'LifeStyle', href: '/category/life-style' },
-  { name: 'Devotional', href: '/category/devotional' },
-  { name: 'Crime', href: '/category/crime' },
   { name: 'Movie', href: '/category/movie' },
   { name: 'Telangana', href: '/category/telangana' },
   { name: 'Andhra Pradesh', href: '/category/andhra-pradesh' },
@@ -26,12 +22,13 @@ export default function Header() {
   const isLoading = status === 'loading';
   const router = useRouter();
 
-  // Check if it's the shorts page
-  const isShortsPage = router.pathname === '/shorts';
+  // --- THIS IS THE FIX ---
+  // Check if we are on ANY special page
+  const isSpecialPage = router.pathname === '/shorts' || router.pathname === '/live';
+  // --- END ---
 
-  // --- 1. RENDER TRANSPARENT SHORTS HEADER ---
-  // This part is the same and works well.
-  if (isShortsPage) {
+  // RENDER THE TRANSPARENT SHORTS/LIVE HEADER
+  if (isSpecialPage) {
     return (
       <>
         <header className="absolute top-0 left-0 right-0 z-30 p-4">
@@ -54,13 +51,12 @@ export default function Header() {
     );
   }
 
-  // --- 2. RENDER THE NEW PROFESSIONAL DESKTOP HEADER ---
+  // RENDER THE DEFAULT HEADER (Your existing code)
   return (
     <header className="sticky top-0 z-30 w-full border-b bg-white shadow-sm">
       {/* Top Bar: Logo, Mobile Menu, Desktop Auth */}
       <div className="container mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         
-        {/* Mobile Menu Button (Hamburger) */}
         <div className="flex md:hidden">
           <button
             onClick={() => setIsMobileMenuOpen(true)}
@@ -70,19 +66,16 @@ export default function Header() {
           </button>
         </div>
         
-        {/* Logo */}
         <div className="flex-1 md:flex-none">
           <Link href="/" className="flex justify-center text-3xl font-extrabold text-gray-900 md:justify-start">
             తెలుగు Shorts
           </Link>
         </div>
 
-        {/* Desktop Auth Section (Now styled consistently) */}
         <nav className="hidden items-center gap-6 md:flex">
           {isLoading ? (
             <div className="h-5 w-24 animate-pulse rounded-md bg-gray-200"></div>
           ) : session ? (
-            // User is Signed In
             <div className="flex items-center gap-4">
               {session.user.image && (
                 <Image
@@ -106,7 +99,6 @@ export default function Header() {
               </button>
             </div>
           ) : (
-            // User is Signed Out
             <button
               onClick={() => signIn()}
               className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
@@ -115,36 +107,36 @@ export default function Header() {
             </button>
           )}
         </nav>
-       
       </div>
 
       {/* Desktop Category Nav Bar */}
-     <nav className="hidden border-t border-gray-800 bg-blue-900 md:flex">
-  <div className="container mx-auto flex max-w-6xl justify-center gap-8 px-4">
-    {CATEGORIES.map((category) => (
-      <Link
-        key={category.name}
-        href={category.href}
-        className="py-3 text-sm font-semibold text-white hover:text-blue-300"
-      >
-        {category.name}
-      </Link>
-    ))}
-    <div className="border-l border-blue-800"></div>
-     <Link href="/live" className="py-3 text-sm font-semibold text-red-600 hover:text-red-700">
+      <nav className="hidden border-t border-gray-100 bg-white md:flex">
+        <div className="container mx-auto flex max-w-6xl justify-center gap-8 px-4">
+          {/* Add the Live link here as well */}
+          <Link href="/live" className="py-3 text-sm font-semibold text-red-600 hover:text-red-700">
             Live
           </Link>
-    <Link href="/shorts" className="py-3 text-sm font-semibold text-white hover:text-blue-300">
-      Shorts
-    </Link>
-    <Link href="/gallery" className="py-3 text-sm font-semibold text-white hover:text-blue-300">
-      Gallery
-    </Link>
-  </div>
-</nav>
+          <div className="border-l border-gray-200"></div>
 
+          {CATEGORIES.map((category) => (
+            <Link
+              key={category.name}
+              href={category.href}
+              className="py-3 text-sm font-semibold text-gray-600 hover:text-blue-600"
+            >
+              {category.name}
+            </Link>
+          ))}
+          <div className="border-l border-gray-200"></div>
+          <Link href="/shorts" className="py-3 text-sm font-semibold text-gray-600 hover:text-blue-600">
+            Shorts
+          </Link>
+          <Link href="/gallery" className="py-3 text-sm font-semibold text-gray-600 hover:text-blue-600">
+            Gallery
+          </Link>
+        </div>
+      </nav>
 
-      {/* Render the Mobile Menu */}
       <MobileMenu
         isOpen={isMobileMenuOpen}
         setIsOpen={setIsMobileMenuOpen}
