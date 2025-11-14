@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "./auth/[...nextauth]";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 
 // The full URL of your site
 const BASE_URL = 'https://www.telugushorts.com';
