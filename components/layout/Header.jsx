@@ -4,8 +4,9 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import Image from 'next/image';
 import { Menu } from 'lucide-react';
 import MobileMenu from './MobileMenu';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/router'; // Import the router
 
+// Define your categories here
 const CATEGORIES = [
   { name: 'Sports', href: '/category/sports' },
   { name: 'Tech', href: '/category/tech' },
@@ -20,14 +21,12 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { data: session, status } = useSession();
   const isLoading = status === 'loading';
-  const router = useRouter();
+  const router = useRouter(); // Use the router
 
-  // --- THIS IS THE FIX ---
-  // Check if we are on ANY special page
+  // Check if we are on the 'live' or 'shorts' page
   const isSpecialPage = router.pathname === '/shorts' || router.pathname === '/live';
-  // --- END ---
 
-  // RENDER THE TRANSPARENT SHORTS/LIVE HEADER
+  // --- RENDER TRANSPARENT HEADER for special pages ---
   if (isSpecialPage) {
     return (
       <>
@@ -51,12 +50,11 @@ export default function Header() {
     );
   }
 
-  // RENDER THE DEFAULT HEADER (Your existing code)
+  // --- RENDER DEFAULT HEADER for all other pages ---
   return (
     <header className="sticky top-0 z-30 w-full border-b bg-white shadow-sm">
-      {/* Top Bar: Logo, Mobile Menu, Desktop Auth */}
+      {/* Top Bar */}
       <div className="container mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        
         <div className="flex md:hidden">
           <button
             onClick={() => setIsMobileMenuOpen(true)}
@@ -112,12 +110,10 @@ export default function Header() {
       {/* Desktop Category Nav Bar */}
       <nav className="hidden border-t border-gray-100 bg-white md:flex">
         <div className="container mx-auto flex max-w-6xl justify-center gap-8 px-4">
-          {/* Add the Live link here as well */}
           <Link href="/live" className="py-3 text-sm font-semibold text-red-600 hover:text-red-700">
             Live
           </Link>
           <div className="border-l border-gray-200"></div>
-
           {CATEGORIES.map((category) => (
             <Link
               key={category.name}
@@ -137,6 +133,7 @@ export default function Header() {
         </div>
       </nav>
 
+      {/* Mobile Menu */}
       <MobileMenu
         isOpen={isMobileMenuOpen}
         setIsOpen={setIsMobileMenuOpen}

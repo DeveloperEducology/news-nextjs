@@ -1,8 +1,7 @@
 import '../styles/globals.css';
-import 'react-quill-new/dist/quill.snow.css'; // <-- 1. UPDATE THIS LINE
+import 'react-quill-new/dist/quill.snow.css'; // Your rich text editor CSS
 import Layout from '../components/layout/Layout';
 import { SessionProvider } from "next-auth/react";
-import { useRouter } from 'next/router';
 import { GoogleAnalytics } from '@next/third-parties/google';
 
 export default function App({
@@ -12,10 +11,8 @@ export default function App({
 
   return (
     <SessionProvider session={session}>
-      {/* We removed the conditional logic here.
-        The <Layout> component (and its Header) will now
-        be rendered on EVERY page.
-      */}
+      
+      {/* The Layout component now wraps EVERY page */}
       <Layout>
         <Component {...pageProps} />
       </Layout>
