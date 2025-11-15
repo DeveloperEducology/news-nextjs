@@ -221,7 +221,7 @@ export default function EditArticlePage({ article, categories }) {
         // --- THIS IS THE NEW PART ---
         // Tell Google to index this new URL
         // We don't 'await' this; just send it.
-        fetch('/api/request-indexing', {
+        fetch('../../api/request-indexing.js', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
