@@ -139,7 +139,7 @@ export default function QuickUpdateModal({ isOpen, onClose }) {
         alert('Live update posted!');
         
         // Ping Google Indexing API
-        fetch('/api/request-indexing', {
+        fetch('../../pages/api/request-indexing.js', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ urlPath: '/live', type: 'URL_UPDATED' })
