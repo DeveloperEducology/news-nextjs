@@ -1,165 +1,263 @@
-import Head from 'next/head';
-import Link from 'next/link';
-import dbConnect from '../lib/mongodb';
-import Article from '../models/Article';
-import { useState } from 'react';
+// pages/index.js
 
-// --- 1. Import your REAL components ---
-// We no longer define Header or SeoHead in this file
-import ArticleCard from '../components/ArticleCard';
-import SeoHead from '../components/SeoHead';
-import Header from '../components/layout/Header';
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import SeoHead from "../components/SeoHead";
+import ArticleCard from "../components/ArticleCard";
+import dbConnect from "../lib/mongodb";
+import Article from "../models/Article";
 
-// ===================================================================
-// 1. HOME PAGE COMPONENT
-// ===================================================================
+// =============================================================
+// 🔥 CATEGORY FILTERS (SEO-FRIENDLY)
+// =============================================================
+const CATEGORIES = [
+  { label: "All", value: "all" },
+  { label: "Politics", value: "politics" },
+  { label: "Business", value: "business" },
+  { label: "Technology", value: "technology" },
+  { label: "Viral", value: "viral" },
+  { label: "Cinema", value: "cinema" },
+  { label: "Sports", value: "sports" },
+];
+
+// =============================================================
+// 🔥 HOMEPAGE COMPONENT
+// =============================================================
 export default function Home({ initialArticles, totalPosts, headlines }) {
   const [articles, setArticles] = useState(initialArticles);
-  const [page, setPage] = useState(2); // Start on page 2 (page 1 is initial)
-  const [isLoading, setIsLoading] = useState(false);
+  const [page, setPage] = useState(2);
+  const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(initialArticles.length < totalPosts);
+  const [category, setCategory] = useState("all");
 
-  // This function fetches from your /api/articles route
-  const loadMorePosts = async () => {
-    setIsLoading(true);
-    
-    try {
-      const res = await fetch(`/api/articles?page=${page}`);
-      const { data: newArticles, total } = await res.json();
+  const observerRef = useRef(null);
 
-      setArticles(prevArticles => [...prevArticles, ...newArticles]);
-      setPage(prevPage => prevPage + 1);
-      if (articles.length + newArticles.length >= total) {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error("Failed to load more articles", error);
-    }
-    
-    setIsLoading(false);
+  // =============================================================
+  // 🔥 INFINITE SCROLL
+  // =============================================================
+  useEffect(() => {
+    if (loading) return;
+
+    if (observerRef.current) observerRef.current.disconnect();
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          loadMore();
+        }
+      },
+      { threshold: 1 }
+    );
+
+    const el = document.getElementById("infinite-loader");
+    if (el) observerRef.current.observe(el);
+  }, [articles, hasMore]);
+
+  const loadMore = async () => {
+    setLoading(true);
+
+    const res = await fetch(`/api/articles?page=${page}&category=${category}`);
+    const { data: newArticles, total } = await res.json();
+
+    setArticles((prev) => [...prev, ...newArticles]);
+    setPage((p) => p + 1);
+
+    if (articles.length + newArticles.length >= total) setHasMore(false);
+
+    setLoading(false);
+  };
+
+  // =============================================================
+  // 🔥 CATEGORY FILTER HANDLER
+  // =============================================================
+  const handleCategoryChange = async (cat) => {
+    setCategory(cat);
+    setPage(2);
+    setLoading(true);
+
+    const res = await fetch(`/api/articles?page=1&category=${cat}`);
+    const { data, total } = await res.json();
+
+    setArticles(data);
+    setHasMore(data.length < total);
+
+    setLoading(false);
   };
 
   return (
-    // We remove the bg-gray-50, as the Layout component handles it
-    <> 
-      <SeoHead 
-        title="Homepage" 
-        description="The very latest news on technology, science, and more."
+    <>
+      <SeoHead
+        title="Latest News – Fast, Accurate, Breaking"
+        description="Get the latest breaking news on politics, business, technology, viral trends, cinema, and more."
       />
 
-      {/* This is your real, full-featured Header component */}
-      {/* <Header /> */}
+      {/* ============================================================= */}
+      {/* 🔥 TRENDING TOP TICKER */}
+      {/* ============================================================= */}
+      <div className="sticky top-0 z-40 bg-black py-2 text-white shadow-md">
+        <div className="container mx-auto flex max-w-7xl items-center gap-4 px-4">
+          <span className="bg-red-600 px-3 py-1 text-xs font-bold">TRENDING</span>
+          <marquee className="text-sm">
+            {headlines.map((h) => h.title).join(" • ")}
+          </marquee>
+        </div>
+      </div>
 
+      {/* ============================================================= */}
+      {/* 🔥 MAIN LAYOUT */}
+      {/* ============================================================= */}
       <main className="container mx-auto max-w-7xl px-4 py-8">
-        
-        {/* --- 2. THIS IS THE GRID FIX ---
-          We use a 3-column grid. Main content takes 2, sidebar takes 1.
-        */}
-        <div className="lg:grid lg:grid-cols-4 lg:gap-8">
 
-          {/* === COLUMN 1: MAIN CONTENT (Scrolls) === */}
-          <div className="lg:col-span-4">
-        
-            
-            <div className="grid grid-cols-3 gap-6 md:grid-cols-3">
-              {articles &&
-                articles.map((article, index) => (
-                  <ArticleCard 
-                    key={article._id} 
-                    article={article} 
-                    // 3. Add 'priority' to the first image for better LCP
-                    priority={index === 0}
-                  />
-                ))}
-            </div>
+        <div className="lg:grid lg:grid-cols-3 lg:gap-10">
 
-            <div className="mt-8 text-center">
-              {hasMore && (
+          {/* ============================================================= */}
+          {/* 🔥 LEFT SIDE (MAIN CONTENT) */}
+          {/* ============================================================= */}
+          <div className="lg:col-span-2">
+
+            {/* 🔥 Category Filters */}
+            <div className="mb-6 flex flex-wrap gap-3">
+              {CATEGORIES.map((c) => (
                 <button
-                  onClick={loadMorePosts}
-                  disabled={isLoading}
-                  className="rounded-md bg-blue-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                  key={c.value}
+                  onClick={() => handleCategoryChange(c.value)}
+                  className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                    category === c.value
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
                 >
-                  {isLoading ? 'Loading...' : 'Load More'}
+                  {c.label}
                 </button>
-              )}
+              ))}
             </div>
+
+            {/* ============================================================= */}
+            {/* 🔥 1 → 2 → 3 Responsive Grid */}
+            {/* ============================================================= */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+              {articles.map((article, index) => (
+                <div
+                  key={article._id}
+                  className="animate-fadeIn"
+                  style={{ animationDelay: `${index * 80}ms` }}
+                >
+                  <ArticleCard article={article} priority={index === 0} />
+                </div>
+              ))}
+            </div>
+
+            {/* ============================================================= */}
+            {/* 🔥 Infinite Loader */}
+            {/* ============================================================= */}
+            {hasMore && (
+              <div id="infinite-loader" className="my-10 flex justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600"></div>
+              </div>
+            )}
           </div>
 
-       
+          {/* ============================================================= */}
+          {/* 🔥 RIGHT SIDE — STICKY HEADLINES SIDEBAR */}
+          {/* ============================================================= */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-32 space-y-4 rounded-xl bg-white p-6 shadow-xl">
+
+              <h3 className="mb-4 text-2xl font-bold text-gray-900">
+                Top Headlines
+              </h3>
+
+              <ul className="space-y-4">
+                {headlines.map((h) => (
+                  <li key={h._id}>
+                    <Link
+                      href={`/article/${h.slug}`}
+                      className="text-lg font-medium leading-snug text-gray-800 hover:text-blue-600"
+                    >
+                      {h.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+            </div>
+          </aside>
+
         </div>
       </main>
+
+      {/* ============================================================= */}
+      {/* 🔥 GLOBAL STYLES (FADE-IN ANIMATION) */}
+      {/* ============================================================= */}
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.4s ease forwards;
+        }
+      `}</style>
     </>
   );
 }
 
-
-// ===================================================================
-// 3. getStaticProps (UPDATED)
-// ===================================================================
-
-// Helper function to serialize data
-function serializeData(data) {
-  return data.map((doc) => {
-    const item = doc.toObject();
-    item._id = item._id.toString();
-    
-    // Use publishedDate as the primary date
-    if (item.publishedDate) {
-      item.createdAt = item.publishedDate.toString();
-    } else if (item.createdAt) {
-      item.createdAt = item.createdAt.toString();
-    }
-    
-    if (item.updatedAt) {
-      item.updatedAt = item.updatedAt.toString();
-    }
-    
-    // Clean up original date object
-    delete item.publishedDate; 
-    return item;
-  });
-}
-
-// ... (Your 'Home' component and 'serializeData' function are fine) ...
-
+// =============================================================
+// 🔥 getStaticProps
+// =============================================================
 export async function getStaticProps() {
   await dbConnect();
-  
+
   const now = new Date();
-  const limit = 10;
-  const headlineLimit = 15;
+  const limit = 12;
 
-  // --- THIS IS THE CORRECTED QUERY ---
   const query = {
-    // 1. The article MUST be a "full article"
     isFullArticle: true,
-    // 2. AND it must be published
-    status: 'published',
-    // 3. AND its publish date must be in the past
-    publishedDate: { $lte: now },
-    
-    // We no longer need the $or operator because the
-    // 'isFullArticle' check correctly separates your content.
+    status: "published",
+    publishedDate: { $lte: now }
   };
-  // --- END OF CORRECTION ---
 
-  // 1. Get the first 10 articles for the main list
+  // Articles
   const result = await Article.find(query)
-    .sort({ publishedDate: -1, createdAt: -1 }) 
-    .limit(limit);
+    .sort({ publishedDate: -1 })
+    .limit(limit)
+    .lean();
 
-  // 2. Get the total count for pagination
   const totalPosts = await Article.countDocuments(query);
 
-  // 3. Get the top 15 headlines for the sidebar (only title and slug)
+  // Headlines
   const headlineResult = await Article.find(query)
-    .sort({ publishedDate: -1, createdAt: -1 })
-    .limit(headlineLimit)
-    .select('title slug');
+    .sort({ publishedDate: -1 })
+    .limit(20)
+    .select("title slug createdAt updatedAt publishedDate")
+    .lean();
 
-  const initialArticles = serializeData(result);
-  const headlines = serializeData(headlineResult);
+  // --- FIXED SERIALIZATION ---
+  const initialArticles = result.map((item) => ({
+    ...item,
+    _id: item._id.toString(),
+    createdAt: item.createdAt ? item.createdAt.toISOString() : null,
+    updatedAt: item.updatedAt ? item.updatedAt.toISOString() : null,
+    publishedDate: item.publishedDate
+      ? item.publishedDate.toISOString()
+      : null,
+  }));
+
+  const headlines = headlineResult.map((item) => ({
+    ...item,
+    _id: item._id.toString(),
+    createdAt: item.createdAt ? item.createdAt.toISOString() : null,
+    updatedAt: item.updatedAt ? item.updatedAt.toISOString() : null,
+    publishedDate: item.publishedDate
+      ? item.publishedDate.toISOString()
+      : null,
+  }));
 
   return {
     props: {
