@@ -1,4 +1,4 @@
-// pages/articles/[slug].js
+// pages/article/[slug].js
 
 import Head from "next/head";
 import Image from "next/image";
@@ -14,35 +14,25 @@ import dbConnect from "../../lib/mongodb";
 import Article from "../../models/Article";
 import Link from "next/link";
 
-const components = {
+// ================================================================
+// MDX-SAFE COMPONENTS
+// ================================================================
+const mdxComponents = {
   img: (props) => (
     <span className="block my-12 overflow-hidden rounded-xl bg-gray-100 shadow-lg">
       <Image
         {...props}
         width={1200}
         height={630}
-        className="w-full object-cover"
         alt={props.alt || "Article image"}
+        className="w-full object-cover"
         unoptimized={true}
       />
     </span>
   ),
-
-  table: ({ children }) => (
-    <div className="my-10 overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-      <table className="min-w-full divide-y divide-gray-200 bg-white">{children}</table>
-    </div>
+  strong: ({ children }) => (
+    <strong className="font-bold text-indigo-600">{children}</strong>
   ),
-
-  thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
-  tbody: ({ children }) => <tbody className="divide-y divide-gray-100">{children}</tbody>,
-  th: ({ children }) => (
-    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-700">
-      {children}
-    </th>
-  ),
-  td: ({ children }) => <td className="px-6 py-4 text-sm text-gray-800">{children}</td>,
-  strong: ({ children }) => <strong className="font-bold text-indigo-600">{children}</strong>,
   blockquote: ({ children }) => (
     <blockquote className="my-12 border-l-4 border-indigo-500 bg-indigo-50 py-6 pl-8 italic text-gray-700">
       {children}
@@ -50,7 +40,9 @@ const components = {
   ),
 };
 
-// ⭐ Auto SEO Keyword Linking
+// ================================================================
+// AUTO-LINK SEO TERMS
+// ================================================================
 function autoLinkSEO(content) {
   if (!content) return content;
 
@@ -73,40 +65,66 @@ function autoLinkSEO(content) {
   return content;
 }
 
-// ⭐ Twitter Embed Fix
+// ================================================================
+// TWITTER EMBED DETECTION
+// ================================================================
 function convertTwitterLinksToEmbeds(content) {
   if (!content) return content;
   content = content.replace(/[\n\r]+/g, " ").trim();
 
-  const twitterRegex =
+  const regex =
     /(https?:\/\/(?:www\.)?(twitter|x)\.com\/[A-Za-z0-9_]+\/status\/\d+)/gi;
 
-  return content.replace(twitterRegex, (url) => {
-    return `
+  return content.replace(
+    regex,
+    (url) => `
       <blockquote class="twitter-tweet" data-dnt="true">
         <a href="${url}"></a>
       </blockquote>
-    `;
-  });
+    `
+  );
 }
 
-// ⭐ Breadcrumbs Component
+// ================================================================
+// SMART MDX SAFE CHECK
+// ================================================================
+function isContentSafeForMDX(content) {
+  if (!content) return false;
+
+  // Unsafe patterns that MDX breaks on
+  const unsafePatterns = [
+    "<span",
+    "<font",
+    "style=",
+    "<script",
+    "<iframe",
+  ];
+
+  return !unsafePatterns.some((pattern) => content.includes(pattern));
+}
+
+// ================================================================
+// BREADCRUMBS
+// ================================================================
 const Breadcrumbs = ({ article }) => (
-  <nav className="text-sm text-gray-600 mb-6">
+  <div className="text-sm text-gray-600 mb-6">
     <Link href="/" className="hover:underline">Home</Link>
     <span className="mx-2">›</span>
-    <Link href="/articles" className="hover:underline">Articles</Link>
+    <Link href="/article" className="hover:underline">Articles</Link>
     <span className="mx-2">›</span>
     <span className="text-gray-900 font-semibold">{article.title}</span>
-  </nav>
+  </div>
 );
 
-export default function ArticlePage({ article, mdxSource, headlines }) {
+// ================================================================
+// ARTICLE PAGE COMPONENT
+// ================================================================
+export default function ArticlePage({ article, mdxSource, useMDX, headlines }) {
   if (!article)
     return <p className="py-32 text-center text-2xl">Loading...</p>;
 
   useEffect(() => {
-    if (window.twttr?.widgets) window.twttr.widgets.load();
+    if (window?.twttr?.widgets) window.twttr.widgets.load();
   }, [article.slug]);
 
   return (
@@ -122,31 +140,57 @@ export default function ArticlePage({ article, mdxSource, headlines }) {
       <div className="container mx-auto max-w-7xl px-4 py-12 font-sans">
         <div className="lg:grid lg:grid-cols-3 lg:gap-10">
 
-          {/* MAIN CONTENT */}
+          {/* LEFT — MAIN ARTICLE */}
           <div className="lg:col-span-2">
-            <article className="prose prose-lg mx-auto max-w-none rounded-2xl bg-white p-8 shadow-2xl md:p-16">
+            <article className="prose prose-lg max-w-none bg-white p-8 rounded-2xl shadow-2xl">
 
               <Breadcrumbs article={article} />
 
-              <h1 className="mb-8 text-4xl font-extrabold">{article.title}</h1>
+              <h1 className="text-4xl font-extrabold mb-6">
+                {article.title}
+              </h1>
 
-              <time className="text-gray-600 text-lg">
+              <time className="text-gray-600">
                 {format(new Date(article.createdAt), "MMMM d, yyyy")}
               </time>
 
-              {mdxSource && (
-                <div className="prose max-w-none mt-10">
-                  <MDXRemote {...mdxSource} components={components} />
+              <div className="my-8">
+                <ShareButtons title={article.title} slug={article.slug} />
+              </div>
+
+              {/* FEATURED IMAGE */}
+              {article.featuredImage && (
+                <div className="relative my-10 h-80 w-full rounded-xl overflow-hidden shadow-xl">
+                  <Image
+                    src={article.featuredImage}
+                    alt={article.title}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                  />
                 </div>
               )}
 
-              {/* Tags */}
+              {/* CONTENT RENDERING */}
+              {useMDX ? (
+                <MDXRemote {...mdxSource} components={mdxComponents} />
+              ) : (
+                <div
+                  className="prose max-w-none"
+                  dangerouslySetInnerHTML={{ __html: article.content }}
+                />
+              )}
+
+              {/* TAGS */}
               {article.tags?.length > 0 && (
-                <div className="mt-20 border-t pt-10">
-                  <h3 className="text-2xl font-bold mb-5">Tags</h3>
+                <div className="mt-20 border-t pt-8">
+                  <h3 className="text-2xl font-bold mb-3">Tags</h3>
                   <div className="flex flex-wrap gap-3">
                     {article.tags.map((t) => (
-                      <span key={t} className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full">
+                      <span
+                        key={t}
+                        className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full"
+                      >
                         #{t}
                       </span>
                     ))}
@@ -154,15 +198,15 @@ export default function ArticlePage({ article, mdxSource, headlines }) {
                 </div>
               )}
 
-              {/* Related Articles */}
+              {/* RELATED ARTICLES */}
               <div className="mt-20 border-t pt-10">
                 <h3 className="text-2xl font-bold mb-5">Related Articles</h3>
-                <ul className="space-y-4">
+                <ul className="space-y-3">
                   {headlines.slice(0, 6).map((h) => (
                     <li key={h._id}>
                       <Link
-                        href={`/articles/${h.slug}`}
-                        className="text-blue-700 hover:underline text-lg"
+                        href={`/article/${h.slug}`}
+                        className="text-blue-700 text-lg hover:underline"
                       >
                         {h.title}
                       </Link>
@@ -170,20 +214,20 @@ export default function ArticlePage({ article, mdxSource, headlines }) {
                   ))}
                 </ul>
               </div>
+
             </article>
           </div>
 
-          {/* HEADLINES Sidebar (Mobile + Desktop) */}
+          {/* RIGHT — HEADLINES SIDEBAR */}
           <aside className="block lg:block mt-10 lg:mt-0">
-            <div className="sticky top-28 p-6 bg-white shadow-xl rounded-xl">
+            <div className="sticky top-28 bg-white p-6 rounded-xl shadow-xl">
               <h3 className="text-2xl font-bold mb-4">Headlines</h3>
-
               <ul className="space-y-3">
                 {headlines.map((h) => (
                   <li key={h._id}>
                     <Link
-                      href={`/articles/${h.slug}`}
-                      className="text-gray-800 hover:text-blue-600 text-lg"
+                      href={`/article/${h.slug}`}
+                      className="text-lg text-gray-800 hover:text-blue-600"
                     >
                       {h.title}
                     </Link>
@@ -199,14 +243,13 @@ export default function ArticlePage({ article, mdxSource, headlines }) {
   );
 }
 
-// NEXT.JS STATIC FUNCTIONS
+// ================================================================
+// getStaticPaths
+// ================================================================
 export async function getStaticPaths() {
   await dbConnect();
 
-  const articles = await Article.find(
-    { status: "published" },
-    "slug"
-  ).lean();
+  const articles = await Article.find({ status: "published" }, "slug").lean();
 
   return {
     paths: articles.map((a) => ({ params: { slug: a.slug } })),
@@ -214,9 +257,11 @@ export async function getStaticPaths() {
   };
 }
 
+// ================================================================
+// getStaticProps
+// ================================================================
 export async function getStaticProps({ params }) {
   await dbConnect();
-  const now = new Date();
 
   const result = await Article.findOne({ slug: params.slug }).lean();
   if (!result) return { notFound: true };
@@ -224,12 +269,12 @@ export async function getStaticProps({ params }) {
   const article = {
     ...result,
     _id: result._id.toString(),
-    createdAt: result.createdAt ? new Date(result.createdAt).toISOString() : null,
-    updatedAt: result.updatedAt ? new Date(result.updatedAt).toISOString() : null,
-    publishedDate: result.publishedDate ? new Date(result.publishedDate).toISOString() : null,
+    createdAt: result.createdAt?.toISOString() ?? null,
+    updatedAt: result.updatedAt?.toISOString() ?? null,
+    publishedDate: result.publishedDate?.toISOString() ?? null,
   };
 
-  // Headlines
+  // Fetch Headlines
   const headlinesResult = await Article.find(
     { status: "published" },
     "title slug"
@@ -243,31 +288,36 @@ export async function getStaticProps({ params }) {
     _id: h._id.toString(),
   }));
 
-  // Build MDX Source
+  // MDX or HTML? (Smart Detection)
+  const raw = he.decode(article.content || "");
+  const contentWithSEO = autoLinkSEO(convertTwitterLinksToEmbeds(raw));
+
+  let useMDX = isContentSafeForMDX(contentWithSEO);
   let mdxSource = null;
 
-  if (article.content) {
-    let content = he.decode(article.content);
+  if (useMDX) {
+    try {
+      const cleaned = contentWithSEO
+        .replace(/<br\s*\/?>/gi, "<br />")
+        .replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, "<br />");
 
-    // ⭐ Fix <br> crash (THE IMPORTANT FIX)
-    content = content.replace(/<br\s*\/?>/gi, "<br />");
-    content = content.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, "<br />");
-
-    // Optional: Remove NBSPs
-    content = content.replace(/\u00A0/g, " ");
-
-    content = autoLinkSEO(content);
-    content = convertTwitterLinksToEmbeds(content);
-
-    mdxSource = await serialize(content, {
-      mdxOptions: { development: false },
-    });
+      mdxSource = await serialize(cleaned, {
+        mdxOptions: { development: false },
+      });
+    } catch (err) {
+      console.error("MDX failed. Falling back to HTML:", err);
+      useMDX = false;
+    }
   }
+
+  // Pass final validated content
+  article.content = contentWithSEO;
 
   return {
     props: {
       article,
       mdxSource,
+      useMDX,
       headlines,
     },
     revalidate: 60,
