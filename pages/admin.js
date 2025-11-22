@@ -1,4 +1,4 @@
-import { getSession } from "next-auth/react";
+import { getSession, useSession } from "next-auth/react";
 import SeoHead from "@/components/SeoHead";
 import dbConnect from "@/lib/mongodb";
 import Article from "@/models/Article";
@@ -7,15 +7,170 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useState, useMemo } from 'react';
-import QuickUpdateModal from '@/components/admin/QuickUpdateModal'; // <-- Your Modal Import
+import QuickUpdateModal from '@/components/admin/QuickUpdateModal';
 
-export default function AdminPage({ articles, galleries }) {
+// Helper: Creates a URL-friendly slug (with Telugu support)
+// Helper: Creates a URL-friendly slug
+const slugify = (str) => {
+  if (!str) return '';
+  str = str.toLowerCase().trim();
+  // This regex checks if the string contains any Telugu characters
+  const teluguRegex = /[\u0C00-\u0C7F]/;
+
+  if (teluguRegex.test(str)) {
+    // --- THIS IS THE FIX ---
+    // The hyphen is now escaped: \-
+    return str.replace(/\s+/g, '-').replace(/[^\u0C00-\u0C7F\w\-]+/g, '');
+    // --- END OF FIX ---
+  } else {
+    // For English, use the aggressive slugify
+    return str.replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+};
+
+// --- THIS IS THE NEW "QUICK POST" FORM ---
+function QuickPostForm({ categories, authorName }) {
   const router = useRouter();
+  const [title, setTitle] = useState('');
+  const [slug, setSlug] = useState('');
+  const [liveContent, setLiveContent] = useState('');
+  const [category, setCategory] = useState(categories[0] || 'General');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleTitleChange = (e) => {
+    const newTitle = e.target.value;
+    setTitle(newTitle);
+    setSlug(slugify(newTitle)); // Auto-generate slug
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError('');
+
+    const dataToSend = {
+      title: title,
+      slug: slug,
+      liveContent: liveContent,
+      isFullArticle: false, // This makes it a "Live Update"
+      status: 'published',
+      summary: liveContent.substring(0, 150).replace(/<[^>]+>/g, ''), // Auto-generate summary
+      author: authorName,
+      category: category,
+    };
+
+    try {
+      const res = await fetch('/api/articles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToSend),
+      });
+
+      if (res.ok) {
+        // Ping Google Indexing API
+        fetch('/api/request-indexing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            urlPath: `/live/${slugify(category)}`,
+            type: 'URL_UPDATED'
+          })
+        });
+        
+        setTitle('');
+        setSlug('');
+        setLiveContent('');
+        alert('Live update posted!');
+        router.push(router.asPath); // Refresh the dashboard
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to post update.');
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+    setIsSubmitting(false);
+  };
+  
+  const formInputClasses = "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500";
+
+  return (
+    <div className="mb-12 rounded-lg bg-white p-6 shadow-lg">
+      <h2 className="text-2xl font-semibold text-gray-800 mb-4">Post a Live Update</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="quickTitle" className="block text-sm font-medium text-gray-700">Title</label>
+          <input
+            type="text"
+            id="quickTitle"
+            value={title}
+            onChange={handleTitleChange}
+            className={formInputClasses}
+            placeholder="Breaking: Event Happening Now"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="quickSlug" className="block text-sm font-medium text-gray-700">Slug (auto-generated)</label>
+          <input
+            type="text"
+            id="quickSlug"
+            value={slug}
+            readOnly
+            className={`${formInputClasses} bg-gray-100`}
+          />
+        </div>
+        <div>
+          <label htmlFor="quickCategory" className="block text-sm font-medium text-gray-700">Category</label>
+          <select
+            id="quickCategory"
+            name="category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className={formInputClasses}
+          >
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="quickContent" className="block text-sm font-medium text-gray-700">Live Content</label>
+          <textarea
+            id="quickContent"
+            value={liveContent}
+            onChange={(e) => setLiveContent(e.target.value)}
+            placeholder="Type your quick update here... (Basic HTML is allowed)"
+            className={`${formInputClasses} font-mono`}
+            rows="4"
+            required
+          />
+        </div>
+        
+        {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+        
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="rounded-md border border-transparent bg-red-600 px-6 py-2 text-base font-medium text-white shadow-sm hover:bg-red-700 disabled:bg-gray-400"
+        >
+          {isSubmitting ? 'Posting...' : 'Post Live'}
+        </button>
+      </form>
+    </div>
+  );
+}
+// --- END OF NEW FORM ---
+
+
+export default function AdminPage({ articles, galleries, categories }) {
+  const router = useRouter();
+  const { data: session } = useSession(); // Get session to pass author name
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterType, setFilterType] = useState('all');
   
-  // Client-side filter logic
   const filteredArticles = useMemo(() => {
     if (filterType === 'full') {
       return articles.filter(article => article.isFullArticle);
@@ -23,42 +178,41 @@ export default function AdminPage({ articles, galleries }) {
     if (filterType === 'live') {
       return articles.filter(article => !article.isFullArticle);
     }
-    return articles; // 'all'
+    return articles;
   }, [articles, filterType]);
 
-  // --- Delete Handler for Articles ---
   const handleArticleDelete = async (slug) => {
-    if (!confirm("Are you sure you want to delete this article?")) return;
+    if (!confirm("Are you sure?")) return;
     try {
-      const res = await fetch(`/api/articles/${slug}`, { method: "DELETE" });
-      if (res.ok) {
-        router.push(router.asPath); // Refresh the page
-      } else {
-        const data = await res.json();
-        alert(`Error: ${data.error || 'Delete failed'}`);
-      }
-    } catch (error) {
-      alert(`An error occurred: ${error.message}`);
-    }
+      await fetch(`/api/articles/${slug}`, { method: "DELETE" });
+      fetch('/api/request-indexing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          urlPath: `/article/${slug}`,
+          type: 'URL_DELETED'
+        })
+      });
+      router.push(router.asPath); 
+    } catch (error) { alert(error.message); }
   };
   
-  // --- Delete Handler for Galleries ---
-  const handleGalleryDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this gallery?")) return;
+  const handleGalleryDelete = async (id, slug) => {
+    if (!confirm("Are you sure?")) return;
     try {
-      const res = await fetch(`/api/galleries/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        router.push(router.asPath); // Refresh the page
-      } else {
-        const data = await res.json();
-        alert(`Error: ${data.error || 'Delete failed'}`);
-      }
-    } catch (error) {
-      alert(`An error occurred: ${error.message}`);
-    }
+      await fetch(`/api/galleries/${id}`, { method: "DELETE" });
+      fetch('/api/request-indexing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          urlPath: `/gallery/${slug}`,
+          type: 'URL_DELETED'
+        })
+      });
+      router.push(router.asPath);
+    } catch (error) { alert(error.message); }
   };
   
-  // --- Helper for Filter Button Styling ---
   const getButtonClass = (type) => {
     return filterType === type
       ? "rounded-md bg-blue-600 px-3 py-1 text-sm font-medium text-white"
@@ -72,12 +226,22 @@ export default function AdminPage({ articles, galleries }) {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
           <div className="flex gap-4">
+            <Link href="/admin/bulk-import" legacyBehavior>
+                <a className="rounded-md bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700">
+                  + Bulk Import
+                </a>
+              </Link>
             <button
               onClick={() => setIsModalOpen(true)}
               className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700"
             >
-              + Quick Update
+              + Quick Update (Modal)
             </button>
+            <Link href="/admin/fetch-tweets" legacyBehavior>
+              <a className="rounded-md bg-cyan-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-cyan-700">
+                + Fetch Tweets
+              </a>
+            </Link>
             <Link href="/admin/create-gallery" legacyBehavior>
               <a className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700">
                 + New Gallery
@@ -90,6 +254,12 @@ export default function AdminPage({ articles, galleries }) {
             </Link>
           </div>
         </div>
+        
+        {/* Pass categories and author to the form */}
+        <QuickPostForm 
+          categories={categories} 
+          authorName={session?.user?.name || 'Admin'}
+        />
 
         {/* --- Articles Table --- */}
         <div className="flex justify-between items-center mb-4">
@@ -167,7 +337,7 @@ export default function AdminPage({ articles, galleries }) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{format(new Date(gallery.publishedDate), "dd MMM, yyyy")}</td>
                   <td className="flex items-center gap-2 px-6 py-4 text-right text-sm font-medium">
                     <Link href={`/admin/gallery/edit/${gallery._id}`} legacyBehavior><a className="rounded-md bg-indigo-100 px-3 py-1 text-indigo-700 hover:bg-indigo-200">Edit</a></Link>
-                    <button onClick={() => handleGalleryDelete(gallery._id)} className="rounded-md bg-red-100 px-3 py-1 text-red-700 hover:bg-red-200">Delete</button>
+                    <button onClick={() => handleGalleryDelete(gallery._id, gallery.slug)} className="rounded-md bg-red-100 px-3 py-1 text-red-700 hover:bg-red-200">Delete</button>
                   </td>
                 </tr>
               ))}
@@ -176,7 +346,6 @@ export default function AdminPage({ articles, galleries }) {
         </div>
       </div>
       
-      {/* --- Render The Modal --- */}
       <QuickUpdateModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -185,7 +354,7 @@ export default function AdminPage({ articles, galleries }) {
   );
 }
 
-// --- getServerSideProps ---
+// --- getServerSideProps (Fetches ALL data) ---
 export async function getServerSideProps(context) {
   const session = await getSession(context);
   if (!session || session.user.role !== "admin") {
@@ -225,14 +394,20 @@ export async function getServerSideProps(context) {
     gallery.createdAt = gallery.createdAt.toString();
     gallery.updatedAt = gallery.updatedAt.toString();
     gallery.publishedDate = gallery.publishedDate.toString();
-    gallery.images = gallery.images.length; 
+    gallery.images = gallery.images.length; // Just send the count
+    gallery.slug = gallery.slug; // <-- Added slug for delete function
     return gallery;
   });
+
+  // Fetch categories
+  const categoriesList = await Article.distinct("category");
+  const sortedCategories = categoriesList.filter(cat => cat).sort();
 
   return {
     props: {
       articles: articles,
       galleries: galleries,
+      categories: sortedCategories,
     },
   };
 }

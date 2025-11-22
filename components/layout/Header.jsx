@@ -108,7 +108,7 @@ export default function Header() {
       </div>
 
       {/* Desktop Category Nav Bar */}
-      <nav className="hidden border-t border-gray-100 bg-white md:flex">
+      <nav className="hidden border-t border-gray-100 bg-blue md:flex">
         <div className="container mx-auto flex max-w-6xl justify-center gap-8 px-4">
           <Link href="/live" className="py-3 text-sm font-semibold text-red-600 hover:text-red-700">
             Live

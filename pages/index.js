@@ -55,13 +55,11 @@ export default function Home({ initialArticles, totalPosts, headlines }) {
         {/* --- 2. THIS IS THE GRID FIX ---
           We use a 3-column grid. Main content takes 2, sidebar takes 1.
         */}
-        <div className="lg:grid lg:grid-cols-3 lg:gap-8">
+        <div className="lg:grid lg:grid-cols-1 lg:gap-8">
 
           {/* === COLUMN 1: MAIN CONTENT (Scrolls) === */}
           <div className="lg:col-span-2">
-            <h1 className="mb-6 text-3xl font-bold text-gray-900">
-              Latest News
-            </h1>
+        
             
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {articles &&
@@ -88,32 +86,7 @@ export default function Home({ initialArticles, totalPosts, headlines }) {
             </div>
           </div>
 
-          {/* === COLUMN 2: SIDEBAR (Sticky) === */}
-          <div className="lg:col-span-1">
-            {/* 4. This 'sticky' class will now work correctly */}
-            <div className="lg:sticky lg:top-24">
-              <div className="mt-8 lg:mt-0">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Latest Headlines
-                </h2>
-                
-                {/* 5. We give this a max-height so only the list scrolls, not the whole sidebar */}
-                <div className="mt-4 max-h-[75vh] overflow-y-auto rounded-lg border bg-white p-4 shadow-sm">
-                  <ul className="divide-y divide-gray-200">
-                    {/* 6. We map over the 'headlines' prop, not sample data */}
-                    {headlines.map((headline) => (
-                      <li key={headline._id} className="py-3">
-                        <Link href={`/article/${headline.slug}`} className="font-medium text-gray-700 hover:text-blue-600">
-                          {headline.title}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-          
+       
         </div>
       </main>
     </>

@@ -1,0 +1,49 @@
+
+
+fetch('/api/bulk-create', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify([
+  {
+    "title": "Samsung Galaxy S26 Ultra Leaks: Massive Camera Upgrade and New AI Chip Revealed",
+    "slug": "samsung-galaxy-s26-ultra-leaks-camera-specs-ai-chip-tech-news",
+    "summary": ".",
+    "content": "The tech world is abuzz with the latest leaks regarding Samsung's upcoming flagship, the Galaxy S26 Ultra. Reports suggest a revolutionary 320MP main sensor and a new 'Snapdragon 8 Elite Gen 2' processor specifically optimized for Galaxy AI. The device is also rumored to feature a titanium frame with a slimmer profile than its predecessor, aiming to redefine the premium smartphone experience in 2026.",
+    "author": "Tech Insider",
+    "category": "tech",
+    "featuredImage": "https://example.com/images/galaxy-s26-ultra.jpg",
+    "tags": [
+      "Samsung Galaxy S26 Ultra",
+      "Smartphone Leaks",
+      "Android",
+      "Tech News",
+      "Mobile Photography"
+    ]
+  },
+  {
+    "title": "Avatar: Fire and Ash - Final Trailer Breaks Internet Records Ahead of December Release",
+    "slug": "avatar-fire-and-ash-trailer-breakdown-james-cameron-release-date-2025",
+    "summary": ".",
+    "content": "James Cameron is back to dominate the box office. The final trailer for 'Avatar: Fire and Ash' has dropped, amassing over 100 million views in just 24 hours. The third installment introduces the 'Ash People,' a more aggressive clan of Na'vi utilizing fire. Fans are praising the groundbreaking VFX and the emotional depth teased in the clip, setting the stage for a massive holiday opening.",
+    "author": "Entertainment Desk",
+    "category": "entertainment",
+    "featuredImage": "https://example.com/images/avatar-3-poster.jpg",
+    "tags": [
+      "Avatar 3",
+      "James Cameron",
+      "Movies",
+      "Hollywood",
+      "Trailer Launch"
+    ]
+  },
+  {
+    "title": "Historic Victory: Team India Defeats Australia to Retain the Border-Gavaskar Trophy 2025",
+    "slug": "india-vs-australia-test-series-win-border-gavaskar-trophy-2025-cricket",
+    "summary": ".",
+    "content": "In a nail-biting finish at the MCG, Team India has scripted history by defeating Australia by 3 wickets to retain the Border-Gavaskar Trophy. Chasing a target of 280 on a turning Day 5 track, the young Indian brigade showed immense resilience. The victory marks India's third consecutive series win on)
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));

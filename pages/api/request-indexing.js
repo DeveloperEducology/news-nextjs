@@ -43,13 +43,15 @@ export default async function handler(req, res) {
     const auth = await getAuthClient();
     const indexing = google.indexing({ version: 'v3', auth });
 
-    // 3. Send the request to Google
+    // --- THIS IS THE FIX ---
+    // The parameter must be 'resource', not 'requestBody'
     const result = await indexing.urlNotifications.publish({
-      requestBody: {
+      resource: {
         url: fullUrl,
         type: type, // 'URL_UPDATED' or 'URL_DELETED'
       },
     });
+    // --- END OF FIX ---
 
     res.status(200).json({ success: true, data: result.data });
   } catch (error) {

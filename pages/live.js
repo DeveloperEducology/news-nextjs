@@ -1,10 +1,10 @@
 import SeoHead from '@/components/SeoHead';
 import dbConnect from '@/lib/mongodb';
-import Article from '@/models/Article'; // Use the Article model
+import Article from '@/models/Article';
 import { format } from 'date-fns';
 import he from 'he';
 import DOMPurify from 'isomorphic-dompurify';
-import { Fragment, useEffect } from 'react'; // Keep useEffect
+import { Fragment, useEffect } from 'react';
 import Script from 'next/script';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -15,7 +15,7 @@ const OPTIMIZED_DOMAINS = [
   'via.placeholder.com',
 ];
 
-// Helper function to escape special XML characters
+// Escape HTML for JSON-LD to prevent DOM break
 function escapeForJsonLd(str = "") {
   return str
     .replace(/\\/g, "\\\\")
@@ -24,11 +24,10 @@ function escapeForJsonLd(str = "") {
     .replace(/<\/script/gi, "<\\/script>");
 }
 
-// Helper component for a single live post
+// Single Live Update Block
 function LiveUpdatePost({ update }) {
-  // --- 1. REMOVE a- THE 'useEffect' FROM THIS COMPONENT ---
-
   let isExternalDomain = true;
+
   if (update.featuredImage) {
     try {
       const url = new URL(update.featuredImage);
@@ -52,19 +51,27 @@ function LiveUpdatePost({ update }) {
     ],
   });
 
+  useEffect(() => {
+    if (window.twttr?.widgets) window.twttr.widgets.load();
+    if (window.instgrm?.Embeds) window.instgrm.Embeds.process();
+  }, [update._id]);
+
   return (
     <article className="rounded-lg bg-white p-5 shadow-lg relative">
       <span className="absolute top-5 left-[-8px] h-3 w-3 rounded-full bg-red-500">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
       </span>
+
       <p className="mb-2 text-xs font-semibold text-red-600">
         {format(new Date(update.publishedDate), "MMMM d, yyyy 'at' hh:mm a")}
       </p>
+
       <h2 className="mb-3 text-2xl font-bold text-gray-900">
         <Link href={`/article/${update.slug}`} className="hover:underline">
           {update.title}
         </Link>
       </h2>
+
       {update.featuredImage && (
         <div className="relative mb-4 w-full h-64 md:h-80">
           <Image
@@ -76,10 +83,12 @@ function LiveUpdatePost({ update }) {
           />
         </div>
       )}
+
       <div
         className="prose max-w-none prose-p:my-2 prose-img:rounded-lg"
         dangerouslySetInnerHTML={{ __html: sanitizedContent }}
       />
+
       <p className="mt-3 text-xs font-medium text-gray-500">
         By {update.author}
       </p>
@@ -90,7 +99,6 @@ function LiveUpdatePost({ update }) {
 // PAGE COMPONENT
 export default function LiveFeedPage({ updates }) {
 
-  // ... (getCoverageTimes and schemaData logic is unchanged) ...
   const getCoverageTimes = () => {
     if (!updates.length) {
       const now = new Date().toISOString();
@@ -103,6 +111,7 @@ export default function LiveFeedPage({ updates }) {
 
   const { startTime, endTime } = getCoverageTimes();
 
+  // SAFE JSON-LD DATA
   const schemaData = {
     "@context": "https://schema.org",
     "@type": "LiveBlogPosting",
@@ -127,17 +136,6 @@ export default function LiveFeedPage({ updates }) {
       "articleBody": escapeForJsonLd(update.liveContent || "")
     }))
   };
-  
-  // --- 2. ADD THE 'useEffect' HERE ---
-  // This will run ONCE after all the posts have rendered
-  useEffect(() => {
-    if (window.twttr && window.twttr.widgets) {
-      window.twttr.widgets.load();
-    }
-    if (window.instgrm && window.instgrm.Embeds) {
-      window.instgrm.Embeds.process();
-    }
-  }, [updates]); // Re-run if the list of updates changes
 
   return (
     <Fragment>
@@ -145,6 +143,7 @@ export default function LiveFeedPage({ updates }) {
         title="Live Updates"
         description="The latest breaking news and live updates."
       />
+
       <Head>
         <script
           type="application/ld+json"
@@ -157,15 +156,13 @@ export default function LiveFeedPage({ updates }) {
       <Script src="https://platform.twitter.com/widgets.js" strategy="afterInteractive" />
       <Script src="//www.instagram.com/embed.js" strategy="afterInteractive" />
 
-      {/* Header is correctly rendered by _app.js */}
-      
       <main className="container mx-auto max-w-3xl px-4 py-8">
         <h1 className="mb-6 text-3xl font-bold text-gray-900">
           Live Updates
         </h1>
 
         <div className="flex flex-col gap-8">
-          {updates.length > 0 ? (
+          {updates.length ? (
             updates.map(update => (
               <LiveUpdatePost key={update._id} update={update} />
             ))
@@ -178,7 +175,7 @@ export default function LiveFeedPage({ updates }) {
   );
 }
 
-// SERVER-SIDE PROPS (unchanged and correct)
+// SERVER-SIDE PROPS
 export async function getServerSideProps() {
   await dbConnect();
   const now = new Date();
@@ -198,7 +195,7 @@ export async function getServerSideProps() {
     update.updatedAt = update.updatedAt.toString();
     update.publishedDate = update.publishedDate.toString();
     update.title = update.title || "Live Update";
-    update.slug = update.slug || "live";
+    update.slug = update.slug;
     update.featuredImage = update.featuredImage || null;
     return update;
   });
