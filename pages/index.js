@@ -55,13 +55,13 @@ export default function Home({ initialArticles, totalPosts, headlines }) {
         {/* --- 2. THIS IS THE GRID FIX ---
           We use a 3-column grid. Main content takes 2, sidebar takes 1.
         */}
-        <div className="lg:grid lg:grid-cols-1 lg:gap-8">
+        <div className="lg:grid lg:grid-cols-4 lg:gap-8">
 
           {/* === COLUMN 1: MAIN CONTENT (Scrolls) === */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-4">
         
             
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="grid grid-cols-3 gap-6 md:grid-cols-3">
               {articles &&
                 articles.map((article, index) => (
                   <ArticleCard 
