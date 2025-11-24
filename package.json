@@ -23,6 +23,7 @@
     "googleapis": "^166.0.0",
     "gray-matter": "^4.0.3",
     "he": "^1.2.0",
+    "html2canvas": "^1.4.1",
     "isomorphic-dompurify": "^2.31.0",
     "lucide-react": "^0.552.0",
     "mongodb": "^5.9.2",

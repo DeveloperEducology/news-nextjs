@@ -91,14 +91,7 @@ function convertTwitterLinksToEmbeds(content) {
 function isContentSafeForMDX(content) {
   if (!content) return false;
 
-  // Unsafe patterns that MDX breaks on
-  const unsafePatterns = [
-    "<span",
-    "<font",
-    "style=",
-    "<script",
-    "<iframe",
-  ];
+  const unsafePatterns = ["<span", "<font", "style=", "<script", "<iframe"];
 
   return !unsafePatterns.some((pattern) => content.includes(pattern));
 }
@@ -107,12 +100,18 @@ function isContentSafeForMDX(content) {
 // BREADCRUMBS
 // ================================================================
 const Breadcrumbs = ({ article }) => (
-  <div className="text-sm text-gray-600 mb-6">
-    <Link href="/" className="hover:underline">Home</Link>
+  <div className="mb-6 text-sm text-gray-600">
+    <Link href="/" className="hover:underline">
+      Home
+    </Link>
     <span className="mx-2">›</span>
-    <Link href="/article" className="hover:underline">Articles</Link>
+    <Link href="/article" className="hover:underline">
+      Articles
+    </Link>
     <span className="mx-2">›</span>
-    <span className="text-gray-900 font-semibold">{article.title}</span>
+    <span className="font-semibold text-gray-900 line-clamp-1">
+      {article.title}
+    </span>
   </div>
 );
 
@@ -123,9 +122,50 @@ export default function ArticlePage({ article, mdxSource, useMDX, headlines }) {
   if (!article)
     return <p className="py-32 text-center text-2xl">Loading...</p>;
 
+  // For Twitter embeds
   useEffect(() => {
     if (window?.twttr?.widgets) window.twttr.widgets.load();
   }, [article.slug]);
+
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL || "https://telugushorts.com";
+  const articleUrl = `${siteUrl}/article/${article.slug}`;
+
+  // --- WHATSAPP STATUS SHARE HANDLER ---
+  const handleWhatsAppStatusShare = async () => {
+    if (typeof window === "undefined") return;
+
+    const statusText = `${article.title} - ${articleUrl}`;
+
+    try {
+      // Progressive enhancement: Web Share API with image file
+      if (
+        navigator.share &&
+        navigator.canShare &&
+        article.featuredImage
+      ) {
+        const res = await fetch(article.featuredImage);
+        const blob = await res.blob();
+        const file = new File([blob], "status.jpg", {
+          type: blob.type || "image/jpeg",
+        });
+
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            text: statusText,
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Web Share failed, falling back to link:", err);
+    }
+
+    // Fallback: normal WhatsApp share (chat / groups)
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(statusText)}`;
+    window.open(waUrl, "_blank");
+  };
 
   return (
     <Fragment>
@@ -135,32 +175,55 @@ export default function ArticlePage({ article, mdxSource, useMDX, headlines }) {
         ogImage={article.featuredImage}
       />
 
-      <Script src="https://platform.twitter.com/widgets.js" strategy="lazyOnload" />
+      <Script
+        src="https://platform.twitter.com/widgets.js"
+        strategy="lazyOnload"
+      />
 
-      <div className="container mx-auto max-w-7xl px-4 py-12 font-sans">
+      <div className="container mx-auto max-w-7xl px-4 py-6 font-sans md:py-10">
         <div className="lg:grid lg:grid-cols-3 lg:gap-10">
-
           {/* LEFT — MAIN ARTICLE */}
           <div className="lg:col-span-2">
-            <article className="prose prose-lg max-w-none bg-white p-8 rounded-2xl shadow-2xl">
-
+            <article className="prose prose-lg max-w-none rounded-2xl bg-white p-4 shadow-2xl md:p-8">
               <Breadcrumbs article={article} />
 
-              <h1 className="text-4xl font-extrabold mb-6">
+              <h1 className="mb-4 text-2xl font-extrabold leading-tight text-gray-900 md:text-4xl">
                 {article.title}
               </h1>
 
-              <time className="text-gray-600">
-                {format(new Date(article.createdAt), "MMMM d, yyyy")}
-              </time>
+              <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                <span>
+                  By{" "}
+                  <strong className="text-gray-900">
+                    {article.author || "TeluguShorts Team"}
+                  </strong>
+                </span>
+                <span>•</span>
+                <time>
+                  {article.createdAt
+                    ? format(new Date(article.createdAt), "MMMM d, yyyy")
+                    : ""}
+                </time>
+              </div>
 
-              <div className="my-8">
+              {/* SHARE ROW */}
+              <div className="mb-6 flex flex-wrap items-center gap-3">
                 <ShareButtons title={article.title} slug={article.slug} />
+
+                {/* NEW: WhatsApp Status Card button */}
+                <button
+                  type="button"
+                  onClick={handleWhatsAppStatusShare}
+                  className="inline-flex items-center rounded-full bg-green-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700"
+                >
+                  <span className="mr-2 text-lg">🟢</span>
+                  <span>Share as WhatsApp Status</span>
+                </button>
               </div>
 
               {/* FEATURED IMAGE */}
               {article.featuredImage && (
-                <div className="relative my-10 h-80 w-full rounded-xl overflow-hidden shadow-xl">
+                <div className="relative my-6 h-64 w-full overflow-hidden rounded-xl shadow-xl md:my-8 md:h-80">
                   <Image
                     src={article.featuredImage}
                     alt={article.title}
@@ -172,24 +235,26 @@ export default function ArticlePage({ article, mdxSource, useMDX, headlines }) {
               )}
 
               {/* CONTENT RENDERING */}
-              {useMDX ? (
-                <MDXRemote {...mdxSource} components={mdxComponents} />
-              ) : (
-                <div
-                  className="prose max-w-none"
-                  dangerouslySetInnerHTML={{ __html: article.content }}
-                />
-              )}
+              <div className="prose max-w-none text-gray-900">
+                {useMDX ? (
+                  <MDXRemote {...mdxSource} components={mdxComponents} />
+                ) : (
+                  <div
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ __html: article.content }}
+                  />
+                )}
+              </div>
 
               {/* TAGS */}
               {article.tags?.length > 0 && (
-                <div className="mt-20 border-t pt-8">
-                  <h3 className="text-2xl font-bold mb-3">Tags</h3>
+                <div className="mt-12 border-t pt-6">
+                  <h3 className="mb-3 text-xl font-bold">Tags</h3>
                   <div className="flex flex-wrap gap-3">
                     {article.tags.map((t) => (
                       <span
                         key={t}
-                        className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full"
+                        className="rounded-full bg-indigo-100 px-4 py-2 text-sm font-medium text-indigo-700"
                       >
                         #{t}
                       </span>
@@ -198,15 +263,15 @@ export default function ArticlePage({ article, mdxSource, useMDX, headlines }) {
                 </div>
               )}
 
-              {/* RELATED ARTICLES */}
-              <div className="mt-20 border-t pt-10">
-                <h3 className="text-2xl font-bold mb-5">Related Articles</h3>
+              {/* MOBILE HEADLINES (below article) */}
+              <div className="mt-12 border-t pt-8 lg:hidden">
+                <h3 className="mb-4 text-xl font-bold">Headlines</h3>
                 <ul className="space-y-3">
-                  {headlines.slice(0, 6).map((h) => (
+                  {headlines.map((h) => (
                     <li key={h._id}>
                       <Link
                         href={`/article/${h.slug}`}
-                        className="text-blue-700 text-lg hover:underline"
+                        className="text-base text-gray-800 hover:text-blue-600"
                       >
                         {h.title}
                       </Link>
@@ -214,20 +279,21 @@ export default function ArticlePage({ article, mdxSource, useMDX, headlines }) {
                   ))}
                 </ul>
               </div>
-
             </article>
           </div>
 
-          {/* RIGHT — HEADLINES SIDEBAR */}
-          <aside className="block lg:block mt-10 lg:mt-0">
-            <div className="sticky top-28 bg-white p-6 rounded-xl shadow-xl">
-              <h3 className="text-2xl font-bold mb-4">Headlines</h3>
+          {/* RIGHT — HEADLINES SIDEBAR (DESKTOP) */}
+          <aside className="mt-8 hidden lg:mt-0 lg:block">
+            <div className="sticky top-24 rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="mb-4 text-2xl font-bold text-gray-900">
+                Headlines
+              </h3>
               <ul className="space-y-3">
                 {headlines.map((h) => (
                   <li key={h._id}>
                     <Link
                       href={`/article/${h.slug}`}
-                      className="text-lg text-gray-800 hover:text-blue-600"
+                      className="text-base text-gray-800 hover:text-blue-600"
                     >
                       {h.title}
                     </Link>
@@ -236,7 +302,6 @@ export default function ArticlePage({ article, mdxSource, useMDX, headlines }) {
               </ul>
             </div>
           </aside>
-
         </div>
       </div>
     </Fragment>
