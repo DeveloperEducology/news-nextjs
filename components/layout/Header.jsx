@@ -14,7 +14,9 @@ const CATEGORIES = [
   { name: 'Telangana', href: '/category/telangana' },
   { name: 'Andhra Pradesh', href: '/category/andhra-pradesh' },
   { name: 'National', href: '/category/national' },
-  { name: 'International', href: '/category/international' },
+  { name: 'viral', href: '/category/viral' },
+{ name: 'International', href: '/category/international' },
+{ name: 'history', href: '/history' },
 ];
 
 export default function Header() {
